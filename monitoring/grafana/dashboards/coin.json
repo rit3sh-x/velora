@@ -191,7 +191,7 @@
       "id": 4,
       "type": "gauge",
       "title": "Avg Sentiment (VADER)",
-      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 5 },
+      "gridPos": { "x": 18, "y": 1, "w": 3, "h": 5 },
       "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
       "targets": [
         {
@@ -204,7 +204,56 @@
           "url_options": { "method": "GET", "data": "" },
           "root_selector": "",
           "columns": [
-            { "selector": "avg_sentiment", "text": "Sentiment", "type": "number" }
+            { "selector": "avg_sentiment", "text": "VADER", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 4,
+          "min": -1,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": -0.2 },
+              { "color": "yellow", "value": -0.05 },
+              { "color": "light-green", "value": 0.05 },
+              { "color": "green", "value": 0.2 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 41,
+      "type": "gauge",
+      "title": "Avg Sentiment (BERT)",
+      "description": "DistilBERT compound. Better for short crypto slang vs VADER.",
+      "gridPos": { "x": 21, "y": 1, "w": 3, "h": 5 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/coin/${coin}/metrics",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "avg_sentiment_bert", "text": "BERT", "type": "number" }
           ],
           "filters": []
         }
@@ -324,9 +373,9 @@
     {
       "id": 7,
       "type": "stat",
-      "title": "Lag-1 Correlation",
-      "description": "Pearson correlation between sentiment shifted 1h and 1h price returns. Needs ≥ 3 hourly samples.",
-      "gridPos": { "x": 8, "y": 7, "w": 5, "h": 4 },
+      "title": "VADER Lag-1",
+      "description": "Pearson corr between VADER sentiment shifted 1 bucket and bucket return. Needs ≥ 3 samples.",
+      "gridPos": { "x": 8, "y": 7, "w": 3, "h": 4 },
       "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
       "targets": [
         {
@@ -377,9 +426,9 @@
     {
       "id": 8,
       "type": "stat",
-      "title": "Lag-2 Correlation",
-      "description": "Pearson correlation between sentiment shifted 2h and 1h price returns.",
-      "gridPos": { "x": 13, "y": 7, "w": 5, "h": 4 },
+      "title": "VADER Lag-2",
+      "description": "Pearson corr between VADER sentiment shifted 2 buckets and bucket return.",
+      "gridPos": { "x": 11, "y": 7, "w": 3, "h": 4 },
       "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
       "targets": [
         {
@@ -428,11 +477,117 @@
       }
     },
     {
+      "id": 71,
+      "type": "stat",
+      "title": "BERT Lag-1",
+      "description": "Pearson corr between BERT sentiment shifted 1 bucket and bucket return.",
+      "gridPos": { "x": 14, "y": 7, "w": 3, "h": 4 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/coin/${coin}/correlation",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "lag1_corr_bert", "text": "BERT L1", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 4,
+          "min": -1,
+          "max": 1,
+          "noValue": "—",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": -0.5 },
+              { "color": "yellow", "value": -0.2 },
+              { "color": "blue", "value": 0 },
+              { "color": "light-green", "value": 0.2 },
+              { "color": "green", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 81,
+      "type": "stat",
+      "title": "BERT Lag-2",
+      "description": "Pearson corr between BERT sentiment shifted 2 buckets and bucket return.",
+      "gridPos": { "x": 17, "y": 7, "w": 3, "h": 4 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/coin/${coin}/correlation",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "lag2_corr_bert", "text": "BERT L2", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 4,
+          "min": -1,
+          "max": 1,
+          "noValue": "—",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": -0.5 },
+              { "color": "yellow", "value": -0.2 },
+              { "color": "blue", "value": 0 },
+              { "color": "light-green", "value": 0.2 },
+              { "color": "green", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 9,
       "type": "stat",
-      "title": "Matched Hours",
-      "description": "Total hours of overlapping price + sentiment data. Need ≥ 3 for any lag correlation.",
-      "gridPos": { "x": 18, "y": 7, "w": 6, "h": 4 },
+      "title": "Matched Buckets",
+      "description": "Total 15-min buckets with overlapping price + sentiment data. Need ≥ 4 for any lag correlation.",
+      "gridPos": { "x": 20, "y": 7, "w": 4, "h": 4 },
       "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
       "targets": [
         {
@@ -725,9 +880,12 @@
           "columns": [
             { "selector": "ts", "text": "time", "type": "timestamp" },
             { "selector": "price", "text": "Price", "type": "number" },
-            { "selector": "avg_compound", "text": "Sentiment", "type": "number" },
-            { "selector": "sentiment_lag1", "text": "Sentiment Lag-1", "type": "number" },
-            { "selector": "sentiment_lag2", "text": "Sentiment Lag-2", "type": "number" }
+            { "selector": "avg_compound", "text": "VADER", "type": "number" },
+            { "selector": "avg_compound_bert", "text": "BERT", "type": "number" },
+            { "selector": "sentiment_lag1", "text": "VADER Lag-1", "type": "number" },
+            { "selector": "sentiment_lag2", "text": "VADER Lag-2", "type": "number" },
+            { "selector": "sentiment_bert_lag1", "text": "BERT Lag-1", "type": "number" },
+            { "selector": "sentiment_bert_lag2", "text": "BERT Lag-2", "type": "number" }
           ],
           "filters": []
         }
@@ -748,7 +906,7 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Sentiment" },
+            "matcher": { "id": "byName", "options": "VADER" },
             "properties": [
               { "id": "color", "value": { "mode": "fixed", "fixedColor": "#B877D9" } },
               { "id": "custom.axisPlacement", "value": "right" },
@@ -757,23 +915,58 @@
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Sentiment Lag-1" },
+            "matcher": { "id": "byName", "options": "BERT" },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FADE2A" } },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#3274D9" } },
               { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
-              { "id": "custom.lineWidth", "value": 1 },
               { "id": "min", "value": -1 },
               { "id": "max", "value": 1 }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Sentiment Lag-2" },
+            "matcher": { "id": "byName", "options": "VADER Lag-1" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FADE2A" } },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
+              { "id": "custom.lineWidth", "value": 1 },
+              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
+              { "id": "min", "value": -1 },
+              { "id": "max", "value": 1 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "VADER Lag-2" },
             "properties": [
               { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } },
               { "id": "custom.axisPlacement", "value": "right" },
               { "id": "custom.lineStyle", "value": { "fill": "dot" } },
               { "id": "custom.lineWidth", "value": 1 },
+              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
+              { "id": "min", "value": -1 },
+              { "id": "max", "value": 1 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "BERT Lag-1" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#37872D" } },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
+              { "id": "custom.lineWidth", "value": 1 },
+              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
+              { "id": "min", "value": -1 },
+              { "id": "max", "value": 1 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "BERT Lag-2" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#C4162A" } },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
+              { "id": "custom.lineWidth", "value": 1 },
+              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
               { "id": "min", "value": -1 },
               { "id": "max", "value": 1 }
             ]

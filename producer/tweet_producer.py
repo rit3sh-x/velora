@@ -65,6 +65,7 @@ async def _scrape_and_publish(coin: str) -> int:
         instance=settings.nitter_url,
         limit=settings.tweets_per_scrape,
         timeout_ms=settings.playwright_timeout_ms,
+        max_pages=settings.tweet_max_pages,
     )
 
     scraped_at = datetime.now(timezone.utc)

@@ -289,16 +289,20 @@ async def sentiment_hourly(
     coin = _resolve_coin(coin)
     rows = await pool.fetch(
         """
-        SELECT hour AS ts,
-               avg_compound_vader AS avg_compound,
-               post_count,
-               positive_pct,
-               negative_pct,
-               neutral_pct
-        FROM sentiment_hourly
+        SELECT
+            time_bucket('1 hour', ts) AS ts,
+            AVG(compound_vader)::DOUBLE PRECISION AS avg_compound,
+            AVG(compound_bert)::DOUBLE PRECISION  AS avg_compound_bert,
+            COUNT(*)::INT                         AS post_count,
+            (AVG(CASE WHEN compound_vader >  0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS positive_pct,
+            (AVG(CASE WHEN compound_vader < -0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS negative_pct,
+            (AVG(CASE WHEN compound_vader BETWEEN -0.05 AND 0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS neutral_pct
+        FROM sentiment_scored
         WHERE coin = $1
-          AND hour >= NOW() - ($2::int * INTERVAL '1 day')
-        ORDER BY hour ASC
+          AND ts >= NOW() - ($2::int * INTERVAL '1 day')
+          AND compound_vader IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1 ASC
         """,
         coin,
         days,
@@ -307,6 +311,7 @@ async def sentiment_hourly(
         {
             "ts": _iso_z(r["ts"]),
             "avg_compound": _clean(r["avg_compound"]) or 0.0,
+            "avg_compound_bert": _clean(r["avg_compound_bert"]) or 0.0,
             "post_count": int(r["post_count"] or 0),
             "positive_pct": _clean(r["positive_pct"]) or 0.0,
             "negative_pct": _clean(r["negative_pct"]) or 0.0,
@@ -328,27 +333,33 @@ async def price_sentiment(
 
     sent_rows = await pool.fetch(
         """
-        SELECT hour AS ts,
-               avg_compound_vader AS avg_compound,
-               post_count,
-               positive_pct,
-               negative_pct,
-               neutral_pct
-        FROM sentiment_hourly
+        SELECT
+            time_bucket('1 hour', ts) AS ts,
+            AVG(compound_vader)::DOUBLE PRECISION AS avg_compound,
+            AVG(compound_bert)::DOUBLE PRECISION  AS avg_compound_bert,
+            COUNT(*)::INT                         AS post_count,
+            (AVG(CASE WHEN compound_vader >  0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS positive_pct,
+            (AVG(CASE WHEN compound_vader < -0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS negative_pct,
+            (AVG(CASE WHEN compound_vader BETWEEN -0.05 AND 0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS neutral_pct
+        FROM sentiment_scored
         WHERE coin = $1
-          AND hour >= NOW() - ($2::int * INTERVAL '1 day')
-        ORDER BY hour ASC
+          AND ts >= NOW() - ($2::int * INTERVAL '1 day')
+          AND compound_vader IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1 ASC
         """,
         coin,
         days,
     )
     price_rows = await pool.fetch(
         """
-        SELECT hour AS ts, close AS price
-        FROM prices_hourly
+        SELECT time_bucket('1 hour', ts) AS ts,
+               last(close, ts)::DOUBLE PRECISION AS price
+        FROM prices_1m
         WHERE coin = $1
-          AND hour >= NOW() - ($2::int * INTERVAL '1 day')
-        ORDER BY hour ASC
+          AND ts >= NOW() - ($2::int * INTERVAL '1 day')
+        GROUP BY 1
+        ORDER BY 1 ASC
         """,
         coin,
         days,
@@ -363,6 +374,7 @@ async def price_sentiment(
             columns=[
                 "ts",
                 "avg_compound",
+                "avg_compound_bert",
                 "post_count",
                 "positive_pct",
                 "negative_pct",
@@ -381,6 +393,8 @@ async def price_sentiment(
         merged["return_1h"] = merged["price"].pct_change()
         merged["sentiment_lag1"] = merged["avg_compound"].shift(1)
         merged["sentiment_lag2"] = merged["avg_compound"].shift(2)
+        merged["sentiment_bert_lag1"] = merged["avg_compound_bert"].shift(1)
+        merged["sentiment_bert_lag2"] = merged["avg_compound_bert"].shift(2)
 
         return _df_to_records(merged)
 
@@ -397,7 +411,7 @@ async def correlation(
 
     summary = await pool.fetchrow(
         """
-        SELECT lag1_corr, lag2_corr,
+        SELECT lag1_corr, lag2_corr, lag1_corr_bert, lag2_corr_bert,
                matched_hours, lag1_points, lag2_points
         FROM aggregates_summary
         WHERE coin = $1
@@ -418,9 +432,11 @@ async def correlation(
 
     latest_sent_row = await pool.fetchrow(
         """
-        SELECT hour, avg_compound_vader
-        FROM sentiment_hourly
-        WHERE coin = $1
+        SELECT time_bucket('1 hour', ts) AS hour,
+               AVG(compound_vader)::DOUBLE PRECISION AS avg_compound_vader
+        FROM sentiment_scored
+        WHERE coin = $1 AND compound_vader IS NOT NULL
+        GROUP BY hour
         ORDER BY hour DESC
         LIMIT 1
         """,
@@ -429,9 +445,12 @@ async def correlation(
 
     last_two_hourly = await pool.fetch(
         """
-        SELECT hour, close
-        FROM prices_hourly
+        SELECT time_bucket('1 hour', ts) AS hour,
+               last(close, ts) AS close
+        FROM prices_1m
         WHERE coin = $1
+          AND ts > NOW() - INTERVAL '4 hours'
+        GROUP BY hour
         ORDER BY hour DESC
         LIMIT 2
         """,
@@ -463,6 +482,8 @@ async def correlation(
         "lag2_points": int(summary["lag2_points"]) if summary else 0,
         "lag1_corr": _clean(summary["lag1_corr"]) if summary else None,
         "lag2_corr": _clean(summary["lag2_corr"]) if summary else None,
+        "lag1_corr_bert": _clean(summary["lag1_corr_bert"]) if summary else None,
+        "lag2_corr_bert": _clean(summary["lag2_corr_bert"]) if summary else None,
         "latest_timestamp": _iso_z(latest_ts) or _iso_z(datetime.now(timezone.utc)),
         "latest_sentiment": latest_sentiment,
         "latest_price": latest_price,
@@ -539,7 +560,7 @@ async def metrics(
 
     row = await pool.fetchrow(
         """
-        SELECT total_posts_24h, avg_sentiment_24h,
+        SELECT total_posts_24h, avg_sentiment_24h, avg_sentiment_bert_24h,
                positive_pct_24h, negative_pct_24h,
                last_price, change_24h_pct
         FROM aggregates_summary
@@ -555,6 +576,7 @@ async def metrics(
             "symbol": spec.symbol,
             "total_posts": 0,
             "avg_sentiment": 0.0,
+            "avg_sentiment_bert": 0.0,
             "positive_pct": 0.0,
             "negative_pct": 0.0,
             "last_price": None,
@@ -567,6 +589,7 @@ async def metrics(
         "symbol": spec.symbol,
         "total_posts": int(row["total_posts_24h"] or 0),
         "avg_sentiment": _clean(row["avg_sentiment_24h"]) or 0.0,
+        "avg_sentiment_bert": _clean(row["avg_sentiment_bert_24h"]) or 0.0,
         "positive_pct": _clean(row["positive_pct_24h"]) or 0.0,
         "negative_pct": _clean(row["negative_pct_24h"]) or 0.0,
         "last_price": _clean(row["last_price"]),

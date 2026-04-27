@@ -58,7 +58,7 @@ _NEXT_HREF_JS = """
 def tweet_id_from_url(url: str) -> str:
     """Derive a stable tweet id from a Nitter status url.
 
-    Example: `https://nitter.tiekoetter.com/user/status/123?foo=1#x`
+    Example: `https://nitter.privacyredirect.com/user/status/123?foo=1#x`
              → `user/status/123`
     """
     parts = urlsplit(url)
@@ -103,13 +103,25 @@ async def scrape_coin(
     instance: str,
     limit: int,
     timeout_ms: int,
+    max_pages: int = 12,
+    since: str | None = None,
+    until: str | None = None,
+    min_faves: int = 0,
 ) -> list[dict[str, Any]]:
     """Scrape up to `limit` tweets from a Nitter search for `query`.
 
-    Returns a list of normalized dicts. Empty list on empty/error page.
+    Walks "Load more" cursor links up to `max_pages` times. Returns
+    normalized dicts; empty list on empty/error page.
     """
     instance = instance.rstrip("/")
-    initial_qs = f"?f=tweets&q={quote_plus(query)}"
+    qs_parts = [f"f=tweets", f"q={quote_plus(query)}"]
+    if since:
+        qs_parts.append(f"since={since}")
+    if until:
+        qs_parts.append(f"until={until}")
+    if min_faves and min_faves > 0:
+        qs_parts.append(f"min_faves={min_faves}")
+    initial_qs = "?" + "&".join(qs_parts)
     seen_urls: set[str] = set()
     tweets: list[dict[str, Any]] = []
 
@@ -120,14 +132,17 @@ async def scrape_coin(
             page = await context.new_page()
 
             cursor: str | None = None
-            while len(tweets) < limit:
+            pages_fetched = 0
+            while len(tweets) < limit and pages_fetched < max_pages:
                 qs = cursor if cursor else initial_qs
                 url = f"{instance}/search{qs}"
-                log.info("[%s] fetching %s", coin, url)
+                log.info(
+                    "[%s] page %d fetching %s", coin, pages_fetched + 1, url
+                )
 
                 try:
                     await page.goto(
-                        url, wait_until="networkidle", timeout=timeout_ms
+                        url, wait_until="domcontentloaded", timeout=timeout_ms
                     )
                 except Exception as exc:
                     log.warning(
@@ -137,7 +152,7 @@ async def scrape_coin(
 
                 try:
                     await page.wait_for_selector(
-                        ".timeline-item, .error-panel",
+                        ".timeline-item, .error-panel, .timeline-end",
                         timeout=min(timeout_ms, 15000),
                     )
                 except Exception as exc:
@@ -148,7 +163,9 @@ async def scrape_coin(
                 raw_items: list[dict[str, Any]] = await page.evaluate(
                     _EXTRACT_JS
                 )
+                pages_fetched += 1
                 if not raw_items:
+                    log.info("[%s] empty page, stop", coin)
                     break
 
                 added_this_page = 0
@@ -164,14 +181,22 @@ async def scrape_coin(
                     if len(tweets) >= limit:
                         break
 
+                log.info(
+                    "[%s] page %d added=%d total=%d",
+                    coin,
+                    pages_fetched,
+                    added_this_page,
+                    len(tweets),
+                )
+
                 if added_this_page == 0:
                     break
-
                 if len(tweets) >= limit:
                     break
 
                 next_href: str | None = await page.evaluate(_NEXT_HREF_JS)
                 if not next_href:
+                    log.info("[%s] no Load more cursor, stop", coin)
                     break
                 cursor = next_href
         finally:

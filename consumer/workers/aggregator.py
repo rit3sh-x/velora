@@ -28,13 +28,13 @@ log = logging.getLogger("velora.worker.aggregator")
 
 _POSTS_24H_SQL = """
 SELECT
-  COALESCE(SUM(post_count), 0)                                                        AS total,
-  COALESCE(SUM(avg_compound_vader * post_count) / NULLIF(SUM(post_count), 0), 0)       AS avg_v,
-  COALESCE(SUM(avg_compound_bert  * post_count) / NULLIF(SUM(post_count), 0), 0)       AS avg_b,
-  COALESCE(SUM(positive_pct * post_count)       / NULLIF(SUM(post_count), 0), 0)       AS pos,
-  COALESCE(SUM(negative_pct * post_count)       / NULLIF(SUM(post_count), 0), 0)       AS neg
-FROM sentiment_hourly
-WHERE coin = $1 AND hour > NOW() - INTERVAL '24 hours'
+  COUNT(*)::INT                                                              AS total,
+  COALESCE(AVG(compound_vader), 0)::DOUBLE PRECISION                          AS avg_v,
+  COALESCE(AVG(compound_bert), 0)::DOUBLE PRECISION                           AS avg_b,
+  COALESCE(AVG(CASE WHEN compound_vader >  0.05 THEN 1.0 ELSE 0.0 END) * 100, 0)::DOUBLE PRECISION AS pos,
+  COALESCE(AVG(CASE WHEN compound_vader < -0.05 THEN 1.0 ELSE 0.0 END) * 100, 0)::DOUBLE PRECISION AS neg
+FROM sentiment_scored
+WHERE coin = $1 AND ts > NOW() - INTERVAL '24 hours' AND compound_vader IS NOT NULL
 """
 
 _LAST_PRICE_SQL = (
@@ -57,13 +57,33 @@ _VOLUME_1H_SQL = (
     "WHERE coin = $1 AND ts > NOW() - INTERVAL '1 hour'"
 )
 
+_LAG_BUCKET = "1 hour"
+
 _LAG_SQL = """
-SELECT s.hour, s.avg_compound_vader, s.post_count, p.close AS price
-FROM sentiment_hourly s
-LEFT JOIN prices_hourly p
-  ON p.coin = s.coin AND p.hour = s.hour
-WHERE s.coin = $1 AND s.hour > NOW() - INTERVAL '7 days'
-ORDER BY s.hour
+WITH price_buckets AS (
+    SELECT time_bucket('1 hour', ts) AS bucket,
+           last(close, ts) AS price
+    FROM prices_1m
+    WHERE coin = $1 AND ts > NOW() - INTERVAL '7 days'
+    GROUP BY bucket
+),
+sent_buckets AS (
+    SELECT time_bucket('1 hour', ts) AS bucket,
+           AVG(compound_vader)::DOUBLE PRECISION AS avg_compound_vader,
+           AVG(compound_bert)::DOUBLE PRECISION  AS avg_compound_bert,
+           COUNT(*)::INT AS post_count
+    FROM sentiment_scored
+    WHERE coin = $1 AND ts > NOW() - INTERVAL '7 days'
+    GROUP BY bucket
+)
+SELECT COALESCE(s.bucket, p.bucket) AS hour,
+       s.avg_compound_vader,
+       s.avg_compound_bert,
+       s.post_count,
+       p.price AS price
+FROM sent_buckets s
+FULL OUTER JOIN price_buckets p ON p.bucket = s.bucket
+ORDER BY hour
 """
 
 _UPSERT_SQL = """
@@ -71,13 +91,15 @@ INSERT INTO aggregates_summary (
     coin, total_posts_24h, avg_sentiment_24h, avg_sentiment_bert_24h,
     positive_pct_24h, negative_pct_24h,
     last_price, change_24h_pct, change_1h_pct, volume_24h, volume_1h,
-    lag1_corr, lag2_corr, matched_hours, lag1_points, lag2_points,
+    lag1_corr, lag2_corr, lag1_corr_bert, lag2_corr_bert,
+    matched_hours, lag1_points, lag2_points,
     computed_at
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6,
     $7, $8, $9, $10, $11,
-    $12, $13, $14, $15, $16,
+    $12, $13, $14, $15,
+    $16, $17, $18,
     NOW()
 )
 ON CONFLICT (coin) DO UPDATE SET
@@ -93,6 +115,8 @@ ON CONFLICT (coin) DO UPDATE SET
     volume_1h              = EXCLUDED.volume_1h,
     lag1_corr              = EXCLUDED.lag1_corr,
     lag2_corr              = EXCLUDED.lag2_corr,
+    lag1_corr_bert         = EXCLUDED.lag1_corr_bert,
+    lag2_corr_bert         = EXCLUDED.lag2_corr_bert,
     matched_hours          = EXCLUDED.matched_hours,
     lag1_points            = EXCLUDED.lag1_points,
     lag2_points            = EXCLUDED.lag2_points,
@@ -123,6 +147,8 @@ def _compute_lag(rows: list[asyncpg.Record]) -> dict[str, object | None]:
         return {
             "lag1_corr": None,
             "lag2_corr": None,
+            "lag1_corr_bert": None,
+            "lag2_corr_bert": None,
             "matched_hours": 0,
             "lag1_points": 0,
             "lag2_points": 0,
@@ -133,6 +159,7 @@ def _compute_lag(rows: list[asyncpg.Record]) -> dict[str, object | None]:
             {
                 "hour": r["hour"],
                 "avg_compound_vader": r["avg_compound_vader"],
+                "avg_compound_bert": r["avg_compound_bert"],
                 "post_count": r["post_count"],
                 "price": r["price"],
             }
@@ -141,23 +168,29 @@ def _compute_lag(rows: list[asyncpg.Record]) -> dict[str, object | None]:
     )
 
     df["return_1h"] = df["price"].pct_change()
-    df["sent_lag1"] = df["avg_compound_vader"].shift(1)
-    df["sent_lag2"] = df["avg_compound_vader"].shift(2)
+    df["sent_ff"] = df["avg_compound_vader"].ffill(limit=3)
+    df["bert_ff"] = df["avg_compound_bert"].ffill(limit=3)
+    df["sent_lag1"] = df["sent_ff"].shift(1)
+    df["sent_lag2"] = df["sent_ff"].shift(2)
+    df["bert_lag1"] = df["bert_ff"].shift(1)
+    df["bert_lag2"] = df["bert_ff"].shift(2)
 
-    matched_hours = int(len(df))
+    matched_hours = int(df.dropna(subset=["avg_compound_vader", "price"]).shape[0])
     lag1_points = int(df.dropna(subset=["sent_lag1", "return_1h"]).shape[0])
     lag2_points = int(df.dropna(subset=["sent_lag2", "return_1h"]).shape[0])
+    bert_lag1_points = int(df.dropna(subset=["bert_lag1", "return_1h"]).shape[0])
+    bert_lag2_points = int(df.dropna(subset=["bert_lag2", "return_1h"]).shape[0])
 
-    if matched_hours < 3:
-        lag1_corr: float | None = None
-        lag2_corr: float | None = None
-    else:
-        lag1_corr = _safe_corr(df["sent_lag1"].corr(df["return_1h"]))
-        lag2_corr = _safe_corr(df["sent_lag2"].corr(df["return_1h"]))
+    lag1_corr = _safe_corr(df["sent_lag1"].corr(df["return_1h"])) if lag1_points >= 3 else None
+    lag2_corr = _safe_corr(df["sent_lag2"].corr(df["return_1h"])) if lag2_points >= 3 else None
+    lag1_corr_bert = _safe_corr(df["bert_lag1"].corr(df["return_1h"])) if bert_lag1_points >= 3 else None
+    lag2_corr_bert = _safe_corr(df["bert_lag2"].corr(df["return_1h"])) if bert_lag2_points >= 3 else None
 
     return {
         "lag1_corr": lag1_corr,
         "lag2_corr": lag2_corr,
+        "lag1_corr_bert": lag1_corr_bert,
+        "lag2_corr_bert": lag2_corr_bert,
         "matched_hours": matched_hours,
         "lag1_points": lag1_points,
         "lag2_points": lag2_points,
@@ -203,6 +236,8 @@ async def _update_coin(conn: asyncpg.Connection, coin: str) -> None:
         volume_1h_f,
         lag["lag1_corr"],
         lag["lag2_corr"],
+        lag["lag1_corr_bert"],
+        lag["lag2_corr_bert"],
         lag["matched_hours"],
         lag["lag1_points"],
         lag["lag2_points"],

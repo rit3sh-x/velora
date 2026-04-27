@@ -38,7 +38,7 @@ Read by `producer/config.py` from the repo-root `.env`:
 | Var | Default | Notes |
 | --- | ------- | ----- |
 | `KAFKA_BROKER` | `localhost:9092` | Bootstrap broker. Cross-machine: producer host LAN IP + 9092. |
-| `NITTER_URL` | `https://nitter.tiekoetter.com` | Single instance; no fallbacks. |
+| `NITTER_URL` | `https://nitter.privacyredirect.com` | Single instance; no fallbacks. |
 | `TWEET_POLL_INTERVAL_SECONDS` | `120` | Seconds between coin rotations. |
 | `TWEETS_PER_SCRAPE` | `30` | Max tweets per cycle. |
 | `PLAYWRIGHT_TIMEOUT_MS` | `30000` | Per-page navigation/wait timeout. |

@@ -22,6 +22,7 @@ if str(_REPO_ROOT) not in sys.path:
 import uvicorn
 
 from consumer.api.main import app
+from consumer.bootstrap_prices import backfill_prices
 from consumer.config import settings
 from consumer.consumers import prices, tweets
 from consumer.db import apply_schema, close_pool, init_pool
@@ -40,6 +41,9 @@ async def main() -> None:
 
     log.info("initializing db pool...")
     pool = await init_pool()
+
+    log.info("backfilling prices_1m from binance...")
+    await backfill_prices(pool)
 
     log.info("spawning workers + uvicorn on %s:%d", settings.api_host, settings.api_port)
 
