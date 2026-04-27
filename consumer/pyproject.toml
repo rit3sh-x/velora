@@ -1,0 +1,21 @@
+[project]
+name = "velora-consumer"
+version = "0.1.0"
+description = "Velora consumer: Kafka → TimescaleDB + sentiment + FastAPI"
+requires-python = ">=3.11"
+dependencies = [
+    "kafka-python>=2.0.2",
+    "asyncpg>=0.30.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pandas>=2.2.0",
+    "numpy>=2.1.0",
+    "vaderSentiment>=3.3.2",
+    "transformers>=4.45.0",
+    "torch>=2.4.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+]
+
+[tool.uv]
+package = false

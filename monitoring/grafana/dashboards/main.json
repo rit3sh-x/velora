@@ -1,0 +1,566 @@
+{
+  "uid": "velora-main",
+  "title": "Velora — Overview",
+  "description": "Aggregate sentiment + market overview across all tracked coins.",
+  "tags": ["velora", "crypto"],
+  "schemaVersion": 39,
+  "version": 3,
+  "editable": true,
+  "graphTooltip": 1,
+  "fiscalYearStartMonth": 0,
+  "liveNow": true,
+  "refresh": "30s",
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["10s", "30s", "1m", "5m"],
+    "time_options": ["1h", "6h", "24h", "7d"]
+  },
+  "timezone": "browser",
+  "annotations": { "list": [] },
+  "templating": { "list": [] },
+  "links": [
+    {
+      "title": "Coin Detail",
+      "type": "link",
+      "url": "/d/velora-coin",
+      "icon": "external link",
+      "tooltip": "Open per-coin dashboard",
+      "targetBlank": false
+    }
+  ],
+  "panels": [
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Market Sentiment",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Posts (24h)",
+      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/global",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "total_posts", "text": "Posts", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "fixed", "fixedColor": "#5794F2" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "gauge",
+      "title": "Avg Sentiment (VADER)",
+      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/global",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "avg_sentiment", "text": "Sentiment", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 4,
+          "min": -1,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": -0.2 },
+              { "color": "yellow", "value": -0.05 },
+              { "color": "light-green", "value": 0.05 },
+              { "color": "green", "value": 0.2 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Positive %",
+      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/global",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "positive_pct", "text": "Positive", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "fixed", "fixedColor": "green" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Negative %",
+      "gridPos": { "x": 18, "y": 1, "w": 6, "h": 5 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/global",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "negative_pct", "text": "Negative", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": { "mode": "fixed", "fixedColor": "red" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Coin Snapshot",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "All Coins — Price + 24h Change",
+      "gridPos": { "x": 0, "y": 7, "w": 24, "h": 8 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/coins",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "coin", "text": "Coin", "type": "string" },
+            { "selector": "symbol", "text": "Symbol", "type": "string" },
+            { "selector": "display", "text": "Name", "type": "string" },
+            { "selector": "last_price", "text": "Price", "type": "number" },
+            { "selector": "change_24h_pct", "text": "Δ 24h", "type": "number" },
+            { "selector": "volume_24h", "text": "Volume 24h", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false },
+        "cellHeight": "md",
+        "sortBy": [{ "displayName": "Volume 24h", "desc": true }]
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "displayMode": "auto", "filterable": true } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Coin" },
+            "properties": [
+              { "id": "custom.width", "value": 110 },
+              { "id": "links", "value": [
+                { "title": "Open ${__value.text} detail", "url": "/d/velora-coin/?var-coin=${__value.text}" }
+              ]}
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Symbol" },
+            "properties": [
+              { "id": "custom.width", "value": 80 },
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Price" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 4 },
+              { "id": "custom.width", "value": 140 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Δ 24h" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              { "id": "unit", "value": "percent" },
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 130 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "orange", "value": -1 },
+                    { "color": "yellow", "value": -0.1 },
+                    { "color": "light-green", "value": 0.1 },
+                    { "color": "green", "value": 1 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Volume 24h" },
+            "properties": [
+              { "id": "unit", "value": "short" },
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 150 }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 102,
+      "type": "row",
+      "title": "Sentiment Rankings",
+      "collapsed": false,
+      "gridPos": { "x": 0, "y": 15, "w": 24, "h": 1 },
+      "panels": []
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Avg Sentiment (VADER) per Coin",
+      "description": "Per-coin weighted VADER compound from /rankings.",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 9 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/rankings",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "coin", "text": "Coin", "type": "string" },
+            { "selector": "avg_compound", "text": "VADER", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "showValue": "always",
+        "stacking": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.8,
+        "barRadius": 0.15,
+        "fullHighlight": false,
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom", "calcs": [] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 4,
+          "min": -1,
+          "max": 1,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": -0.2 },
+              { "color": "yellow", "value": -0.05 },
+              { "color": "light-green", "value": 0.05 },
+              { "color": "green", "value": 0.2 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Post Volume per Coin",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 9 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/rankings",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "coin", "text": "Coin", "type": "string" },
+            { "selector": "post_volume", "text": "Posts", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "showValue": "always",
+        "stacking": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.8,
+        "barRadius": 0.15,
+        "fullHighlight": false,
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "showLegend": false, "displayMode": "list", "placement": "bottom", "calcs": [] }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": { "mode": "fixed", "fixedColor": "#B877D9" }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 8,
+      "type": "table",
+      "title": "Rankings (by post volume)",
+      "gridPos": { "x": 0, "y": 25, "w": 12, "h": 10 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/rankings",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "coin", "text": "Coin", "type": "string" },
+            { "selector": "post_volume", "text": "Post Volume", "type": "number" },
+            { "selector": "avg_compound", "text": "Avg Sentiment", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false },
+        "cellHeight": "md",
+        "sortBy": [{ "displayName": "Post Volume", "desc": true }]
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "displayMode": "auto", "filterable": true } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Coin" },
+            "properties": [
+              { "id": "links", "value": [
+                { "title": "Open ${__value.text} detail", "url": "/d/velora-coin/?var-coin=${__value.text}" }
+              ]}
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Avg Sentiment" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              { "id": "decimals", "value": 4 },
+              { "id": "min", "value": -1 },
+              { "id": "max", "value": 1 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "orange", "value": -0.2 },
+                    { "color": "yellow", "value": -0.05 },
+                    { "color": "light-green", "value": 0.05 },
+                    { "color": "green", "value": 0.2 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Trending (by abs 1h change)",
+      "gridPos": { "x": 12, "y": 25, "w": 12, "h": 10 },
+      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/trending",
+          "url_options": { "method": "GET", "data": "" },
+          "root_selector": "",
+          "columns": [
+            { "selector": "coin", "text": "Coin", "type": "string" },
+            { "selector": "symbol", "text": "Symbol", "type": "string" },
+            { "selector": "last_price", "text": "Price", "type": "number" },
+            { "selector": "change_1h_pct", "text": "Δ 1h", "type": "number" },
+            { "selector": "volume_1h", "text": "Volume 1h", "type": "number" }
+          ],
+          "filters": []
+        }
+      ],
+      "options": { "showHeader": true, "footer": { "show": false }, "cellHeight": "md" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "displayMode": "auto", "filterable": true } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Coin" },
+            "properties": [
+              { "id": "links", "value": [
+                { "title": "Open ${__value.text} detail", "url": "/d/velora-coin/?var-coin=${__value.text}" }
+              ]}
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Symbol" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Price" },
+            "properties": [
+              { "id": "unit", "value": "currencyUSD" },
+              { "id": "decimals", "value": 4 }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Δ 1h" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
+              { "id": "unit", "value": "percent" },
+              { "id": "decimals", "value": 2 },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    { "color": "red", "value": null },
+                    { "color": "orange", "value": -0.5 },
+                    { "color": "yellow", "value": -0.05 },
+                    { "color": "light-green", "value": 0.05 },
+                    { "color": "green", "value": 0.5 }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Volume 1h" },
+            "properties": [
+              { "id": "unit", "value": "short" },
+              { "id": "decimals", "value": 2 }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
