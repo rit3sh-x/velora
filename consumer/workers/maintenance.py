@@ -1,16 +1,3 @@
-"""Periodic database maintenance.
-
-Every ``settings.maintenance_interval_seconds`` (default 6h):
-- VACUUM ANALYZE on hypertables (TSDB chunk-aware)
-- Log retention job status from timescaledb_information.jobs
-
-Continuous aggregate refresh is owned by ``cagg_refresh.py`` (V18).
-
-``VACUUM`` cannot run inside a transaction block. asyncpg statements run
-in autocommit mode unless ``conn.transaction()`` is opened. We
-deliberately call ``conn.execute("VACUUM ANALYZE ...;")`` outside any
-transaction helper.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -28,9 +15,10 @@ log = logging.getLogger("velora.worker.maintenance")
 
 _HYPERTABLES = (
     "prices_1m",
-    "raw_tweets",
     "sentiment_scored",
     "coin_live_sentiment",
+    "predictions",
+    "recommendations",
 )
 
 _RETENTION_STATUS_SQL = """

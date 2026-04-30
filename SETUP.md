@@ -1,21 +1,35 @@
 # Velora — Setup Guide
 
-Crypto sentiment dashboard. Two-machine pipeline (or single machine for dev).
+Crypto sentiment dashboard. Producer + Spark + Consumer + Grafana, Kafka-bridged, medallion lake (Mongo bronze → Timescale silver+gold).
+
+> **⚠ Schema migration**: this revision changed silver PKs + dropped `raw_tweets` (now in Mongo) + new `predictions`/`recommendations`/`aggregates_by_source` tables (V50). **`down -v` mandatory** — no in-place upgrade. Re-seed required after.
+>
+> **🧠 Memory**: full stack ~6–8 GB RAM. Spark worker w/ BERT loaded ≈ 3 GB. Borderline on 8 GB dev laptops; close other apps.
 
 ```
-                               consumer infra (docker)
-                               TimescaleDB <- schema auto-applied @ container init
-                                     ^
-producer (machine A)              consumer (machine B)
-------------------                --------------------
-binance_producer --+              +--- consumers/prices -+
-tweet_producer  ---+---> Kafka ----->|                    |---> TimescaleDB --> aggregator --> FastAPI --> Grafana
-                                  +--- consumers/tweets -+                       ^
-                                                                                |
-                                                                         vader + bert workers
-seed/ (optional, one-shot) --- prices REST ---> DB direct
-                            +-- tweets Nitter -> Kafka -> consumer dedupes
+                                       MEDALLION
+                                       ─────────
+PRODUCER (machine A)                                         CONSUMER (machine B)
+──────────────────                                           ────────────────────
+binance_producer ─┐                                             ┌─→ prices ─→ Timescale prices_1m
+tweet_producer  ──┤                                             │
+bluesky_producer ─┴─→ Kafka :9092 (velora.tweets) ──┬──→ tweets ─→ Mongo BRONZE
+                                                    │
+                                                    └──→ Spark sentiment_stream ─→ Kafka velora.sentiment
+                                                                                          │
+                                                                                          ▼
+                                                                          consumer/sentiment ─→ Timescale SILVER
+                                                                                          │
+                                                                                          ▼
+                                                                                   GOLD: aggregator,
+                                                                                   predictor, recommender
+                                                                                          │
+                                                                                          ▼
+                                                                                   FastAPI → Grafana
+                                                                                   (4-tier dashboard)
 ```
+
+**4-tier dashboard rows**: 🟦 DESCRIPTIVE | 🟨 DIAGNOSTIC | 🟧 PREDICTIVE | 🟥 PRESCRIPTIVE.
 
 ---
 
@@ -62,11 +76,16 @@ Defaults are correct for single-machine. No edits needed.
 ### C. Boot infrastructure
 
 ```bash
-docker compose -f docker-compose.consumer.yml up -d   # timescaledb (auto-applies schema) + grafana
-docker compose -f docker-compose.producer.yml up -d   # zookeeper + kafka
+docker compose -f docker-compose.consumer.yml up -d
+docker compose -f docker-compose.producer.yml up -d
+docker compose -f docker-compose.spark.yml    up -d --build
 ```
 
-Wait ~30 seconds. Verify all four healthy:
+Producer compose includes a one-shot `kafka-init` service that depends on `kafka: service_healthy` and creates the 3 velora topics (`velora.prices`, `velora.tweets`, `velora.sentiment`) w/ 6 partitions each, then exits. Auto-runs every `up -d`. ⊥ manual step needed.
+
+The first Spark build downloads Kafka connector JARs + bakes Python deps incl. torch/transformers/pyarrow (~6 min cold). First Spark run downloads BERT model into `spark-hf-cache` volume (~250 MB). Subsequent restarts skip both.
+
+Wait ~60 seconds. Verify all healthy:
 
 ```bash
 docker ps --format 'table {{.Names}}\t{{.Status}}'
@@ -75,61 +94,68 @@ docker ps --format 'table {{.Names}}\t{{.Status}}'
 Expected:
 
 ```
-NAMES                STATUS
-velora-kafka         Up 30 seconds (healthy)
-velora-zookeeper     Up 30 seconds (healthy)
-velora-grafana       Up 30 seconds (healthy)
-velora-timescaledb   Up 30 seconds (healthy)
+NAMES                       STATUS
+velora-kafka                Up 60 seconds (healthy)
+velora-zookeeper            Up 60 seconds (healthy)
+velora-grafana              Up 60 seconds (healthy)
+velora-timescaledb          Up 60 seconds (healthy)
+velora-mongodb              Up 60 seconds (healthy)
+velora-spark-master         Up 60 seconds (healthy)
+velora-spark-worker         Up 60 seconds
+velora-spark-submit         Up 60 seconds
 ```
 
-**Schema is applied automatically.** `seed/schema.sql` is mounted into the Timescale container at `/docker-entrypoint-initdb.d/01_schema.sql:ro`. The Postgres image runs every `*.sql` in that directory **the first time** the data volume is initialized.
+**Schemas are applied automatically:**
+- Timescale: `schema/schema.sql` → `/docker-entrypoint-initdb.d/01_schema.sql`
+- Mongo:     `schema/01_indexes.js` → `/docker-entrypoint-initdb.d/01_indexes.js`
 
-Important caveats:
-- Init scripts run **only on empty data dir**. Subsequent `up -d` skips them (data preserved).
-- Schema changes require `down -v` (wipes the volume) to re-init. See §6.
+Init scripts run **only on empty data dir**. Subsequent `up -d` skips them.
 
-Quick check tables exist:
+> **Schema changes (any silver/gold PK, CAGG group-by, new table) → `down -v` mandatory** (V50). No in-place migration path. Re-seed required after.
+
+Quick checks tables/collections exist:
 
 ```bash
 docker exec velora-timescaledb psql -U velora -d velora -c "\dt"
+# expect: prices_1m, sentiment_scored, aggregates_summary, aggregates_by_source,
+#         coin_live_sentiment, predictions, recommendations
+docker exec velora-mongodb mongosh --quiet --eval "db.getSiblingDB('velora').raw_tweets.getIndexes().map(i=>i.name)"
+# expect: _id_, uniq_tweet_source, coin_ts_desc, coin_source_ts_desc, ts_ttl
 ```
-
-You should see `prices_1m`, `raw_tweets`, `sentiment_scored`, `aggregates_summary`, `coin_live_sentiment`.
 
 ### D. Seed (optional, one-shot historical backfill)
 
-Skip this section for a true cold-start demo. Run it to skip the first ~12 minute fill window with ~24h of prices and ~2 days of tweets.
+Skip for cold-start demo. Run to skip the first ~12 minute fill window: ~24h of prices + ~7d of tweets from both Twitter and Bluesky.
 
 ```bash
 cd seed
-uv sync                                # pulls asyncpg, kafka-python, playwright, pydantic
-uv run playwright install chromium     # ~2 min, ~200MB. ONE-TIME install.
+uv sync                                # asyncpg, kafka-python, playwright, httpx, pydantic
+uv run playwright install chromium     # ~2 min, ~200 MB, ONE-TIME
 uv run python -m seed
 ```
 
 What it does:
-- **Prices**: pulls ~24h of 1m klines from Binance REST per coin, bulk-inserts into `prices_1m` (`ON CONFLICT DO NOTHING`). Skips coins with ≥23h existing history.
-- **Tweets**: scrapes ~2 days of tweets per coin via Nitter date-bounded search and **publishes to Kafka** as `TweetEvent`s. The consumer ingests them via the normal path and dedupes via PK `(tweet_id, ts) ON CONFLICT DO NOTHING`. Skips coins with ≥200 recent tweets.
+- **Prices**: ~24h of 1m klines from Binance REST per coin → `prices_1m` direct insert (`ON CONFLICT DO NOTHING`). Skips coins with ≥23h existing history.
+- **Twitter**: ~7d of tweets per coin via Nitter date-bounded search → Kafka. Consumer dedupes via Mongo unique idx `(tweet_id, source)`.
+- **Bluesky**: ~7d of posts per coin via public unauthenticated `searchPosts` (`https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts`) → Kafka. Same dedupe path.
 
-Idempotent — safe to re-run; cheap when fresh. Tweet seed publishes to Kafka, so it works whether or not the consumer is already running:
-- Consumer running → tweets ingested as they arrive.
-- Consumer not running yet → Kafka buffers; tweets ingested when consumer comes up.
+Idempotent — safe to re-run; cheap when fresh. All three publish to Kafka (except prices) so works whether consumer is up or buffering.
 
 ### E. Producer (terminal 1)
 
 ```bash
 cd producer
-uv sync                                # ~30s, installs kafka-python, websockets, playwright, etc.
-uv run playwright install chromium     # ~2 min, ~200MB. ONE-TIME install. Skip if already done in step D.
-uv run python run.py                   # Binance WS + Nitter scraper → Kafka
+uv sync                                # kafka-python, websockets, playwright, pydantic
+uv run playwright install chromium     # ~2 min, ~200 MB, ONE-TIME (skip if done in D)
+uv run python run.py                   # Binance WS + Twitter (Nitter) + Bluesky (Jetstream WS) → Kafka
 ```
 
 Expected log:
-
 ```
 INFO velora.producer.binance: connecting to wss://stream.binance.com...
 INFO velora.producer.tweets: tweet producer running: 6 coins concurrent, interval=120s, limit=100
-INFO velora.producer.binance: price bitcoin 67065.20 ...
+INFO velora.producer.bluesky: connecting bluesky jetstream wss://jetstream1.us-east...
+INFO velora.producer.bluesky: bluesky jetstream connected
 ```
 
 Leave running.
@@ -138,25 +164,41 @@ Leave running.
 
 ```bash
 cd consumer
-uv sync                                # ~3 min on first run (torch + transformers heavy)
-uv run python run.py                   # init pool + 7 async tasks + uvicorn
+uv sync                                # ~3 min cold (torch + transformers heavy)
+uv run python run.py                   # asyncpg + motor + 8 async tasks + uvicorn
 ```
 
 Expected log:
-
 ```
-INFO velora: initializing db pool...
+INFO velora: initializing pg pool + mongo client...
+INFO velora.db_mongo: mongo connected
 INFO velora: spawning workers + uvicorn on 0.0.0.0:8000
-INFO uvicorn.error: Uvicorn running on http://0.0.0.0:8000
-INFO velora.consumer.prices: prices consumer connected
+INFO velora: sentiment_backend=spark: ingesting velora.sentiment from Kafka
 INFO velora.consumer.tweets: tweets consumer connected
-INFO velora.worker.vader: vader loop started (interval=30s)
+INFO velora.consumer.sentiment: sentiment consumer connected
 INFO velora.worker.aggregator: aggregator worker started (interval=60s)
+INFO velora.worker.predictor: predictor worker started (interval=300s horizons=[15, 60, 240])
+INFO velora.worker.recommender: recommender worker started (interval=300s thresh=±0.40)
 ```
 
-(No more `applying schema...` line — schema is owned by docker init, not the app.)
+> No more `vader/bert worker started` lines — Spark owns sentiment compute. Set `SENTIMENT_BACKEND=python` to revert (legacy, broken vs. V37 — needs rewrite).
 
 Leave running.
+
+### G. Spark logs (terminal 3, optional)
+
+```bash
+docker compose -f docker-compose.spark.yml logs -f spark-submit
+```
+
+Expected:
+```
+INFO velora.spark.sentiment: starting velora sentiment stream | kafka=... checkpoint=/opt/spark/checkpoints
+INFO velora.spark.sentiment: Q1 VADER stream started: trigger=30s
+INFO velora.spark.sentiment: Q2 BERT stream started: model=distilbert-... batch=64 trigger=300s
+```
+
+Spark UI: http://localhost:8080 (master), http://localhost:4040 (driver, only while job running).
 
 ---
 
@@ -179,11 +221,11 @@ docker exec -it velora-timescaledb psql -U velora -d velora -c \
 After ~2 min you should see rows starting to populate per coin (or immediately, if you ran the seed step).
 
 ```bash
-docker exec -it velora-timescaledb psql -U velora -d velora -c \
-  "SELECT coin, COUNT(*) FROM raw_tweets GROUP BY coin;"
+docker exec velora-mongodb mongosh --quiet --eval \
+  "db.getSiblingDB('velora').raw_tweets.aggregate([{\$group:{_id:'\$coin',n:{\$sum:1}}}]).toArray()"
 ```
 
-After one full rotation (~2 min, since all 6 coins scrape concurrently per cycle), you should see ~100 tweets each (or several thousand if you ran the seed step).
+After one full rotation (~2 min) Mongo bronze should have ~100+ tweets per coin (Twitter via Nitter every 120 s + Bluesky Jetstream firehose continuous). Several thousand if seed ran.
 
 ### Grafana
 
@@ -269,24 +311,58 @@ cd seed && uv sync && uv run playwright install chromium && uv run python -m see
 
 ## 5. Daily operations
 
-### Start (after first setup)
+### Stop everything (full)
 
 ```bash
-docker compose -f docker-compose.consumer.yml up -d
-docker compose -f docker-compose.producer.yml up -d
-cd producer && uv run python run.py    # terminal 1
-cd consumer && uv run python run.py    # terminal 2
+# 1. Ctrl-C in producer + consumer terminals (graceful Python shutdown)
+
+# 2. Stop docker stacks (preserves volumes/data)
+docker compose -f docker-compose.spark.yml    stop
+docker compose -f docker-compose.producer.yml stop
+docker compose -f docker-compose.consumer.yml stop
 ```
 
-### Stop
+### Start everything (after first setup, data preserved)
 
-- Ctrl-C in both terminals (graceful shutdown)
-- Optional: `docker compose -f docker-compose.consumer.yml stop` (preserves data)
+```bash
+# 1. Boot stacks (kafka-init auto-creates topics on healthy)
+docker compose -f docker-compose.consumer.yml up -d
+docker compose -f docker-compose.producer.yml up -d
+docker compose -f docker-compose.spark.yml    up -d
 
-### Restart Grafana only (after dashboard JSON change)
+# 2. Verify all healthy (kafka-init shows status=Exited 0 when done — that's correct)
+docker ps -a --format "table {{.Names}}\t{{.Status}}"
+
+# 3. Producer (terminal 1)
+cd producer ; uv run python run.py
+
+# 4. Consumer (terminal 2)
+cd consumer ; uv run python run.py
+
+# 5. (optional) Spark stream logs (terminal 3)
+docker compose -f docker-compose.spark.yml logs -f spark-submit
+```
+
+### Apply changes after `.env` edit (re-read env)
+
+`docker compose restart` does NOT re-read `.env`. Must `up -d --force-recreate`:
+
+```bash
+docker compose -f docker-compose.consumer.yml up -d --force-recreate
+docker compose -f docker-compose.producer.yml up -d --force-recreate
+docker compose -f docker-compose.spark.yml    up -d --force-recreate
+
+# Restart Python processes (Ctrl-C then re-run) so they pick up new .env
+cd producer ; uv run python run.py
+cd consumer ; uv run python run.py
+```
+
+### Restart only one container (no env change)
 
 ```bash
 docker compose -f docker-compose.consumer.yml restart grafana
+docker compose -f docker-compose.spark.yml    restart spark-submit
+docker compose -f docker-compose.producer.yml restart kafka
 ```
 
 ### Tail container logs
@@ -294,7 +370,10 @@ docker compose -f docker-compose.consumer.yml restart grafana
 ```bash
 docker logs -f velora-kafka
 docker logs -f velora-timescaledb
+docker logs -f velora-mongodb
 docker logs -f velora-grafana
+docker logs -f velora-spark-master
+docker logs -f velora-spark-submit
 ```
 
 ---
@@ -311,29 +390,34 @@ docker compose -f docker-compose.producer.yml restart
 ### Hard reset (wipe all data + re-apply schema)
 
 ```bash
-# Kill app processes (Ctrl-C in both terminals)
+# 1. Kill app processes (Ctrl-C in producer + consumer terminals)
 
-docker compose -f docker-compose.consumer.yml down -v
+# 2. Tear down all 3 stacks WITH volumes
+docker compose -f docker-compose.spark.yml    down -v
 docker compose -f docker-compose.producer.yml down -v
+docker compose -f docker-compose.consumer.yml down -v
 
-# Optional: wipe Python venvs
-rm -rf producer/.venv consumer/.venv seed/.venv
+# 3. (optional) Wipe Python venvs to force-resync deps
+rm -rf producer/.venv consumer/.venv seed/.venv spark/.venv
 
-# Re-run section 2 from step C (schema is re-applied automatically by init)
+# 4. Boot fresh — kafka-init auto-creates topics
+docker compose -f docker-compose.consumer.yml up -d
+docker compose -f docker-compose.producer.yml up -d
+docker compose -f docker-compose.spark.yml    up -d --build
 ```
 
-`-v` deletes volumes (TimescaleDB rows, Kafka offsets, Grafana state). Drop `-v` to keep data across container recreation.
+`-v` deletes volumes (Timescale rows, Mongo bronze, Kafka offsets, Grafana state, Spark checkpoints, HF model cache). Drop `-v` to keep data across container recreation.
 
-### Schema evolution (changed `seed/schema.sql`)
+### Schema evolution (changed `schema/schema.sql` or `schema/01_indexes.js`)
 
-Postgres init scripts run **only on empty data volumes**. To pick up schema changes in dev:
+Postgres + Mongo init scripts run **only on empty data volumes**. To pick up schema changes in dev:
 
 ```bash
 docker compose -f docker-compose.consumer.yml down -v
 docker compose -f docker-compose.consumer.yml up -d
 ```
 
-This wipes the database and re-applies the new schema. For production, use a real migration tool (Alembic, sqitch). Out of scope for this project.
+This wipes Timescale + Mongo (+ Grafana state) and re-applies the new schemas. For production, use a real migration tool (Alembic, sqitch). Out of scope for this project.
 
 ---
 
@@ -342,6 +426,16 @@ This wipes the database and re-applies the new schema. For production, use a rea
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `kafka unhealthy` | Still booting (slow first start) | Wait 30s, retry. `docker logs velora-kafka` |
+| `InconsistentClusterIdException: ... doesn't match stored clusterId` | `kafka-data` volume has old cluster ID; zookeeper got wiped (or vice versa) | `docker compose -f docker-compose.producer.yml down -v && up -d` — wipes both volumes, fresh cluster |
+| `NodeExistsException` when kafka starts | Stale zookeeper broker registration | `docker compose -f docker-compose.producer.yml down -v && up -d` |
+| `NoBrokersAvailable` from python producer/consumer | `.env` `KAFKA_BROKER` ≠ reachable LOCAL listener | Must be `localhost:9092` on same machine; restart processes |
+| `pull access denied for bitnami/spark` or `velora/spark` | Bitnami removed free tier Aug 28 2025 / pre-build pull race | Image now `apache/spark:3.5.4`; `pull_policy: never` on worker+submit |
+| `ModuleNotFoundError: No module named 'spark'` in spark-submit | preprocess.py outside mounted dir | Already fixed: file at `spark/jobs/preprocess.py` w/ sibling import |
+| `PyArrow >= 4.0.0 must be installed` | pandas-UDF needs Arrow | Already in Dockerfile.spark; rebuild w/ `--no-cache` if missing |
+| `UnknownTopicOrPartitionException` in Spark | Topics not pre-created | Run topic-create command (§2.C above or §5 Start) |
+| Spark `No resolvable bootstrap urls` | Stale env in container | `docker compose -f docker-compose.spark.yml up -d --force-recreate spark-submit` |
+| Bluesky seed 6× 403 Forbidden | Bluesky public XRPC ⊥ supports cursor/since unauth | Already handled — graceful skip; live Jetstream firehose covers ongoing data |
+| Dashboard rows show `â€"` mojibake | Em-dash encoding mismatch | Already fixed (replaced w/ ASCII `\|`); hard-refresh browser |
 | `connection refused :5432` | TimescaleDB not ready | Wait 10s |
 | `relation "prices_1m" does not exist` | Schema not applied (volume pre-existed without schema mount) | `docker compose -f docker-compose.consumer.yml down -v && up -d` |
 | `connection refused :9092` cross-machine | Firewall blocking | Open port 9092 inbound on producer machine |
@@ -354,6 +448,7 @@ This wipes the database and re-applies the new schema. For production, use a rea
 | BERT loading hangs | First-run model download (~250MB) | Wait, or set `BERT_ENABLED=false` in `.env` |
 | `.env not loading` | Env file in wrong dir | Must be at repo root (next to `docker-compose.*.yml`) |
 | Tweet table empty for some coins | Nitter instance flaky | Try alternate instance in `NITTER_URL`. Producer logs cycle errors |
+| Tweets missing in Grafana but Mongo has them | Spark didn't score yet (first 30s after producer start) | Wait one VADER trigger cycle; check `docker logs velora-spark-submit` |
 
 ---
 
@@ -386,10 +481,24 @@ docker exec -it velora-timescaledb psql -U velora -d velora
 
 # Common queries
 SELECT coin, COUNT(*) FROM prices_1m GROUP BY coin;
-SELECT coin, COUNT(*) FROM raw_tweets GROUP BY coin;
-SELECT coin, COUNT(*) FROM sentiment_scored WHERE compound_vader IS NOT NULL GROUP BY coin;
+SELECT coin, source, COUNT(*) FROM sentiment_scored WHERE compound_vader IS NOT NULL GROUP BY coin, source;
 SELECT * FROM aggregates_summary;
+SELECT * FROM aggregates_by_source;
+SELECT * FROM predictions ORDER BY ts DESC LIMIT 12;
+SELECT * FROM recommendations ORDER BY ts DESC LIMIT 6;
 SELECT view_name, materialization_hypertable_name FROM timescaledb_information.continuous_aggregates;
+```
+
+### Inspect MongoDB (bronze)
+
+```bash
+docker exec -it velora-mongodb mongosh velora
+
+# Common queries
+db.raw_tweets.countDocuments()
+db.raw_tweets.aggregate([{$group: {_id: {coin:"$coin", source:"$source"}, n:{$sum:1}}}])
+db.raw_tweets.find({coin:"bitcoin"}).sort({ts:-1}).limit(5)
+db.raw_tweets.getIndexes().map(i => i.name)
 ```
 
 ### Test scrape one coin manually

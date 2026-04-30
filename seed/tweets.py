@@ -1,11 +1,3 @@
-"""Historical tweet backfill via Nitter date-bounded search.
-
-Run via the `seed` package entrypoint AFTER the producer + consumer are up.
-Walks N days back per coin, scraping all paginated tweets per window via
-Playwright. Publishes each tweet to Kafka as a TweetEvent so the existing
-consumer ingests it normally. Idempotent — safe to re-run; cheap when data
-is fresh (per-coin skip on healthy 24h tweet count).
-"""
 from __future__ import annotations
 
 import asyncio
@@ -36,11 +28,15 @@ async def needs_backfill(
     min_recent_tweets: int = 200,
     window_hours: int = 24,
 ) -> bool:
-    """True if we should backfill — i.e. fewer than `min_recent_tweets` in last `window_hours`."""
+    """True if we should backfill — i.e. fewer than `min_recent_tweets` scored last `window_hours`.
+
+    Bronze (raw tweets) lives in Mongo per V37; query silver `sentiment_scored`
+    (twitter only) as proxy for "have recent twitter history". Cold-run = backfill.
+    """
     cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
     row = await pool.fetchrow(
-        "SELECT COUNT(*) AS n, MIN(ts) AS oldest FROM raw_tweets "
-        "WHERE coin = $1 AND ts >= $2",
+        "SELECT COUNT(*) AS n FROM sentiment_scored "
+        "WHERE coin = $1 AND source = 'twitter' AND ts >= $2",
         coin,
         cutoff,
     )
@@ -135,15 +131,7 @@ async def backfill_tweets(pool: asyncpg.Pool | None = None) -> None:
     targets: list[CoinSpec] = []
     for spec in COINS:
         if pool is not None and not await needs_backfill(pool, spec.coin):
-            row = await pool.fetchrow(
-                "SELECT COUNT(*) AS n, MIN(ts) AS oldest FROM raw_tweets "
-                "WHERE coin = $1 AND ts >= $2",
-                spec.coin,
-                datetime.now(timezone.utc) - timedelta(hours=24),
-            )
-            n = row["n"] if row else 0
-            oldest = row["oldest"] if row else None
-            log.info("[%s] skipping backfill: have %d rows since %s", spec.coin, n, oldest)
+            log.info("[%s] skipping twitter backfill: silver has fresh history", spec.coin)
             continue
         targets.append(spec)
 
@@ -155,5 +143,10 @@ async def backfill_tweets(pool: asyncpg.Pool | None = None) -> None:
         *(_backfill_coin(spec) for spec in targets),
         return_exceptions=True,
     )
-    total = sum(c for c in counts if isinstance(c, int))
+    total = 0
+    for c, spec in zip(counts, targets):
+        if isinstance(c, int):
+            total += c
+        else:
+            log.error("[%s] backfill raised: %r", spec.coin, c)
     log.info("tweet backfill complete: %d total tweets published", total)

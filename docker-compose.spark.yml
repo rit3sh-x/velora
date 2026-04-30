@@ -1,0 +1,104 @@
+name: velora-spark
+
+networks:
+  velora-spark-net:
+    driver: bridge
+
+volumes:
+  spark-checkpoints:
+  spark-hf-cache:
+
+services:
+  spark-master:
+    build:
+      context: ./spark
+      dockerfile: Dockerfile.spark
+    image: velora/spark:3.5
+    container_name: velora-spark-master
+    networks: [velora-spark-net]
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      PYTHONPATH: /opt/spark
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    volumes:
+      - ./shared:/opt/spark/shared:ro
+      - ./spark/jobs:/opt/spark/jobs:ro
+      - spark-checkpoints:/opt/spark/checkpoints
+      - spark-hf-cache:/opt/spark/hf-cache
+    command: >
+      /opt/spark/bin/spark-class
+        org.apache.spark.deploy.master.Master
+        --host 0.0.0.0
+        --port 7077
+        --webui-port 8080
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ >/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  spark-worker:
+    image: velora/spark:3.5
+    pull_policy: never
+    container_name: velora-spark-worker
+    networks: [velora-spark-net]
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      HF_HOME: /opt/spark/hf-cache
+      PYTHONPATH: /opt/spark
+    volumes:
+      - ./shared:/opt/spark/shared:ro
+      - ./spark/jobs:/opt/spark/jobs:ro
+      - spark-checkpoints:/opt/spark/checkpoints
+      - spark-hf-cache:/opt/spark/hf-cache
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    command: >
+      /opt/spark/bin/spark-class
+        org.apache.spark.deploy.worker.Worker
+        --memory 4G
+        --cores 2
+        --webui-port 8081
+        spark://spark-master:7077
+
+  spark-submit:
+    image: velora/spark:3.5
+    pull_policy: never
+    container_name: velora-spark-submit
+    networks: [velora-spark-net]
+    environment:
+      SPARK_KAFKA_BOOTSTRAP: ${SPARK_KAFKA_BOOTSTRAP:-host.docker.internal:9092}
+      SPARK_CHECKPOINT_DIR: /opt/spark/checkpoints
+      SPARK_VADER_TRIGGER_SECONDS: ${SPARK_VADER_TRIGGER_SECONDS:-30}
+      SPARK_BERT_TRIGGER_SECONDS: ${SPARK_BERT_TRIGGER_SECONDS:-300}
+      BERT_MODEL: ${BERT_MODEL:-distilbert-base-uncased-finetuned-sst-2-english}
+      BERT_BATCH_SIZE: ${BERT_BATCH_SIZE:-64}
+      BERT_ENABLED: ${BERT_ENABLED:-true}
+      HF_HOME: /opt/spark/hf-cache
+      PYTHONPATH: /opt/spark
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./shared:/opt/spark/shared:ro
+      - ./spark/jobs:/opt/spark/jobs:ro
+      - spark-checkpoints:/opt/spark/checkpoints
+      - spark-hf-cache:/opt/spark/hf-cache
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      spark-worker:
+        condition: service_started
+    command: >-
+      /opt/spark/bin/spark-submit
+        --master spark://spark-master:7077
+        --deploy-mode client
+        --conf spark.driver.host=spark-submit
+        --conf spark.driver.bindAddress=0.0.0.0
+        --conf spark.executor.memory=2g
+        --conf spark.driver.memory=1g
+        --py-files /opt/spark/jobs/preprocess.py
+        /opt/spark/jobs/sentiment_stream.py
+    restart: on-failure

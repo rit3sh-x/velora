@@ -1,17 +1,3 @@
-"""Live sentiment rolling-window worker.
-
-Every ``settings.live_sentiment_interval_seconds`` seconds, for each
-coin in ``COIN_NAMES``, computes a rolling snapshot from the most recent
-100 sentiment-scored rows (no time-window cutoff -- V21) and upserts a
-per-minute bucket into ``coin_live_sentiment``.
-
-``oldest_age_sec`` reports staleness so the dashboard can show a "stale"
-badge when the rolling sample is old.
-
-When no scored tweets exist at all, the bucket is still upserted with
-``n_tweets = 0`` and NULL averages.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -28,12 +14,15 @@ from shared.coins import COIN_NAMES
 
 log = logging.getLogger("velora.worker.live_sentiment")
 
+_SOURCES = ("twitter", "bluesky")
+
 
 _RECENT_SQL = """
 WITH recent AS (
     SELECT compound_vader, compound_bert, ts
     FROM sentiment_scored
     WHERE coin = $1
+      AND source = $2
       AND compound_vader IS NOT NULL
     ORDER BY ts DESC
     LIMIT 100
@@ -47,9 +36,9 @@ FROM recent;
 """
 
 _UPSERT_SQL = """
-INSERT INTO coin_live_sentiment (coin, bucket_ts, n_tweets, avg_vader, avg_bert, oldest_age_sec)
-VALUES ($1, date_trunc('minute', NOW()), $2, $3, $4, $5)
-ON CONFLICT (coin, bucket_ts) DO UPDATE SET
+INSERT INTO coin_live_sentiment (coin, source, bucket_ts, n_tweets, avg_vader, avg_bert, oldest_age_sec)
+VALUES ($1, $2, date_trunc('minute', NOW()), $3, $4, $5, $6)
+ON CONFLICT (coin, source, bucket_ts) DO UPDATE SET
     n_tweets       = EXCLUDED.n_tweets,
     avg_vader      = EXCLUDED.avg_vader,
     avg_bert       = EXCLUDED.avg_bert,
@@ -57,41 +46,31 @@ ON CONFLICT (coin, bucket_ts) DO UPDATE SET
 """
 
 
-async def _update_coin(conn: asyncpg.Connection, coin: str) -> None:
-    row = await conn.fetchrow(_RECENT_SQL, coin)
-
+async def _update(conn: asyncpg.Connection, coin: str, source: str) -> None:
+    row = await conn.fetchrow(_RECENT_SQL, coin, source)
     n = int(row["n"]) if row and row["n"] is not None else 0
     if n == 0:
-        await conn.execute(_UPSERT_SQL, coin, 0, None, None, None)
-        log.debug("live_sent %s n=0 (stale)", coin)
+        await conn.execute(_UPSERT_SQL, coin, source, 0, None, None, None)
         return
 
     avg_v = float(row["avg_v"]) if row["avg_v"] is not None else None
     avg_b = float(row["avg_b"]) if row["avg_b"] is not None else None
     oldest_age_sec = int(row["oldest_age_sec"]) if row["oldest_age_sec"] is not None else None
 
-    await conn.execute(_UPSERT_SQL, coin, n, avg_v, avg_b, oldest_age_sec)
-
-    log.debug(
-        "live_sent %s n=%d avg_v=%s avg_b=%s oldest=%ss",
-        coin,
-        n,
-        avg_v,
-        avg_b,
-        oldest_age_sec,
-    )
+    await conn.execute(_UPSERT_SQL, coin, source, n, avg_v, avg_b, oldest_age_sec)
 
 
 async def _tick(pool: asyncpg.Pool) -> None:
     async with pool.acquire() as conn:
         for coin in COIN_NAMES:
-            try:
-                await _update_coin(conn, coin)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("live_sentiment: failed for coin=%s", coin)
-    log.info("live_sentiment: refreshed %d coins", len(COIN_NAMES))
+            for source in _SOURCES:
+                try:
+                    await _update(conn, coin, source)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("live_sentiment: failed coin=%s source=%s", coin, source)
+    log.info("live_sentiment: refreshed %d coins × %d sources", len(COIN_NAMES), len(_SOURCES))
 
 
 async def run(pool: asyncpg.Pool) -> None:

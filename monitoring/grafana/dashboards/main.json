@@ -1,6 +1,6 @@
 {
   "uid": "velora-main",
-  "title": "Velora \u00e2\u20ac\u201d Overview",
+  "title": "Velora - Overview",
   "description": "Aggregate sentiment + market overview across all tracked coins.",
   "tags": [
     "velora",
@@ -36,7 +36,67 @@
     "list": []
   },
   "templating": {
-    "list": []
+    "list": [
+      {
+        "name": "coin_each",
+        "type": "custom",
+        "label": "coin_each",
+        "hide": 2,
+        "multi": true,
+        "includeAll": true,
+        "current": {
+          "text": [
+            "bitcoin",
+            "ethereum",
+            "solana",
+            "ripple",
+            "binance",
+            "dogecoin"
+          ],
+          "value": [
+            "bitcoin",
+            "ethereum",
+            "solana",
+            "ripple",
+            "binance",
+            "dogecoin"
+          ]
+        },
+        "options": [
+          {
+            "text": "bitcoin",
+            "value": "bitcoin",
+            "selected": true
+          },
+          {
+            "text": "ethereum",
+            "value": "ethereum",
+            "selected": true
+          },
+          {
+            "text": "solana",
+            "value": "solana",
+            "selected": true
+          },
+          {
+            "text": "ripple",
+            "value": "ripple",
+            "selected": true
+          },
+          {
+            "text": "binance",
+            "value": "binance",
+            "selected": true
+          },
+          {
+            "text": "dogecoin",
+            "value": "dogecoin",
+            "selected": true
+          }
+        ],
+        "query": "bitcoin,ethereum,solana,ripple,binance,dogecoin"
+      }
+    ]
   },
   "links": [
     {
@@ -367,7 +427,7 @@
     {
       "id": 5,
       "type": "table",
-      "title": "All Coins \u00e2\u20ac\u201d Price + 24h Change",
+      "title": "All Coins - Price + 24h Change",
       "gridPos": {
         "x": 0,
         "y": 7,
@@ -417,7 +477,7 @@
             },
             {
               "selector": "change_24h_pct",
-              "text": "\u00ce\u201d 24h",
+              "text": "delta 24h",
               "type": "number"
             },
             {
@@ -515,7 +575,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "\u00ce\u201d 24h"
+              "options": "delta 24h"
             },
             "properties": [
               {
@@ -984,7 +1044,7 @@
             },
             {
               "selector": "change_1h_pct",
-              "text": "\u00ce\u201d 1h",
+              "text": "delta 1h",
               "type": "number"
             },
             {
@@ -1064,7 +1124,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "\u00ce\u201d 1h"
+              "options": "delta 1h"
             },
             "properties": [
               {
@@ -1130,6 +1190,120 @@
           }
         ]
       }
+    },
+    {
+      "id": 203,
+      "type": "row",
+      "title": "🟥 PRESCRIPTIVE | coin signals",
+      "gridPos": {
+        "x": 0,
+        "y": 35,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 240,
+      "type": "stat",
+      "title": "${coin} signal",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 4,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "R",
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "http://host.docker.internal:8000/coin/${coin:value}/recommend",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "signal",
+              "text": "signal",
+              "type": "string"
+            },
+            {
+              "selector": "score",
+              "text": "score",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "buy": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "BUY ▲"
+                },
+                "sell": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "SELL ▼"
+                },
+                "hold": {
+                  "color": "yellow",
+                  "index": 2,
+                  "text": "HOLD —"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "orientation": "auto"
+      },
+      "repeat": "coin_each",
+      "repeatDirection": "h"
     }
   ]
 }

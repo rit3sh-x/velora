@@ -26,5 +26,14 @@ class Settings(BaseSettings):
     tweet_backfill_pages_per_day: int = 30
     tweet_backfill_max_per_day: int = 600
 
+    bluesky_jetstream_url: str = (
+        "wss://jetstream1.us-east.bsky.network/subscribe"
+        "?wantedCollections=app.bsky.feed.post"
+    )
+    bluesky_public_api_url: str = "https://public.api.bsky.app"
+    bluesky_reconnect_backoff_initial: float = 2.0
+    bluesky_reconnect_backoff_max: float = 60.0
+    bluesky_seed_posts_per_query: int = 100
+
 
 settings = Settings()

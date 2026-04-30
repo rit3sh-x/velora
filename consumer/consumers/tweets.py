@@ -1,10 +1,3 @@
-"""Kafka -> TimescaleDB consumer for velora.tweets.
-
-Long-running asyncio task. Polls KafkaConsumer (sync, kafka-python) inside
-asyncio.to_thread(), parses each record into a TweetEvent, and inserts into
-the raw_tweets hypertable with ON CONFLICT DO NOTHING.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -13,73 +6,85 @@ import logging
 import sys
 from pathlib import Path
 
-import asyncpg
 from kafka import KafkaConsumer
 from kafka.errors import KafkaError
 from pydantic import ValidationError
+from pymongo import ReturnDocument
+from pymongo.errors import PyMongoError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from consumer.config import settings
+from consumer.db_mongo import get_tweets_collection
 from shared.schemas import TweetEvent
 from shared.topics import TWEETS
 
 log = logging.getLogger("velora.consumer.tweets")
 
-GROUP_ID = "velora-consumer-tweets"
+GROUP_ID = "velora.bronze.tweets"
 POLL_TIMEOUT_MS = 1000
 RECONNECT_BACKOFF_SECONDS = 5.0
 
-INSERT_SQL = """
-INSERT INTO raw_tweets (tweet_id, coin, ts, scraped_at, text, username, url, likes, retweets, replies)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-ON CONFLICT (tweet_id, ts) DO NOTHING
-"""
-
 
 def _build_consumer() -> KafkaConsumer:
-    """Construct a KafkaConsumer subscribed to the tweets topic."""
     return KafkaConsumer(
         TWEETS,
         bootstrap_servers=settings.kafka_broker,
         group_id=GROUP_ID,
-        auto_offset_reset="latest",
+        auto_offset_reset="earliest",
         enable_auto_commit=True,
         value_deserializer=lambda b: json.loads(b.decode("utf-8")),
         consumer_timeout_ms=-1,
     )
 
 
-async def _handle_record(conn: asyncpg.Connection, raw_value: object) -> None:
-    """Parse one Kafka record value and insert into raw_tweets."""
+def _event_to_doc(event: TweetEvent) -> dict[str, object]:
+    """TweetEvent → bronze Mongo doc. V71 shape."""
+    return {
+        "tweet_id":   event.tweet_id,
+        "coin":       event.coin,
+        "ts":         event.ts,
+        "scraped_at": event.scraped_at,
+        "text":       event.text,
+        "source":     event.source,
+        "username":   event.username,
+        "url":        event.url,
+        "likes":      event.likes,
+        "retweets":   event.retweets,
+        "replies":    event.replies,
+    }
+
+
+async def _handle_record(raw_value: object) -> None:
+    """Parse one Kafka record value and upsert into Mongo bronze."""
     try:
         event = TweetEvent.model_validate(raw_value)
     except ValidationError as exc:
         log.warning("tweet parse error: %s | payload=%r", exc, raw_value)
         return
 
-    status = await conn.execute(
-        INSERT_SQL,
-        event.tweet_id,
-        event.coin,
-        event.ts,
-        event.scraped_at,
-        event.text,
-        event.username,
-        event.url,
-        event.likes,
-        event.retweets,
-        event.replies,
-    )
-    if status.endswith(" 0"):
-        log.debug("skipped duplicate tweet_id=%s coin=%s ts=%s",
-                  event.tweet_id, event.coin, event.ts)
+    coll = get_tweets_collection()
+    doc = _event_to_doc(event)
+
+    try:
+        result = await coll.update_one(
+            {"tweet_id": event.tweet_id, "source": event.source},
+            {"$setOnInsert": doc},
+            upsert=True,
+        )
+    except PyMongoError as exc:
+        log.warning("mongo upsert error: %s | tweet_id=%s source=%s",
+                    exc, event.tweet_id, event.source)
+        return
+
+    if result.upserted_id is not None:
+        log.debug("inserted tweet_id=%s source=%s coin=%s ts=%s",
+                  event.tweet_id, event.source, event.coin, event.ts)
     else:
-        log.debug("inserted tweet_id=%s coin=%s ts=%s",
-                  event.tweet_id, event.coin, event.ts)
+        log.debug("dup tweet_id=%s source=%s", event.tweet_id, event.source)
 
 
-async def run(pool: asyncpg.Pool) -> None:
+async def run() -> None:
     """Long-running consumer loop. Designed for asyncio.gather()."""
     log.info("starting tweets consumer (broker=%s topic=%s group=%s)",
              settings.kafka_broker, TWEETS, GROUP_ID)
@@ -110,10 +115,9 @@ async def run(pool: asyncpg.Pool) -> None:
                 await asyncio.sleep(0)
                 continue
 
-            async with pool.acquire() as conn:
-                for _tp, records in batch.items():
-                    for record in records:
-                        await _handle_record(conn, record.value)
+            for _tp, records in batch.items():
+                for record in records:
+                    await _handle_record(record.value)
 
     except asyncio.CancelledError:
         log.info("tweets consumer cancelled; shutting down")

@@ -1,0 +1,35 @@
+FROM apache/spark:3.5.4
+
+USER root
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir \
+    "vaderSentiment>=3.3.2" \
+    "transformers>=4.46.0,<4.47" \
+    "torch>=2.4.0,<2.5" \
+    "emoji>=2.10.0" \
+    "langdetect>=1.0.9" \
+    "pandas>=2.0.0,<2.1" \
+    "numpy>=1.24.0,<2" \
+    "pyarrow>=14.0.0,<16"
+
+ENV KAFKA_CONNECTOR_VERSION=3.5.1
+ENV KAFKA_CLIENT_VERSION=3.5.1
+ENV COMMONS_POOL_VERSION=2.11.1
+RUN cd /opt/spark/jars && \
+    curl -fsSL -O "https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/${KAFKA_CONNECTOR_VERSION}/spark-sql-kafka-0-10_2.12-${KAFKA_CONNECTOR_VERSION}.jar" && \
+    curl -fsSL -O "https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/${KAFKA_CONNECTOR_VERSION}/spark-token-provider-kafka-0-10_2.12-${KAFKA_CONNECTOR_VERSION}.jar" && \
+    curl -fsSL -O "https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/${KAFKA_CLIENT_VERSION}/kafka-clients-${KAFKA_CLIENT_VERSION}.jar" && \
+    curl -fsSL -O "https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/${COMMONS_POOL_VERSION}/commons-pool2-${COMMONS_POOL_VERSION}.jar"
+
+RUN mkdir -p /opt/spark/jobs /opt/spark/checkpoints /opt/spark/hf-cache /opt/spark/shared && \
+    chown -R 185:185 /opt/spark/jobs /opt/spark/checkpoints /opt/spark/hf-cache /opt/spark/shared
+
+ENV PYTHONPATH=/opt/spark
+ENV HF_HOME=/opt/spark/hf-cache
+ENV TRANSFORMERS_OFFLINE=0
+
+USER 185

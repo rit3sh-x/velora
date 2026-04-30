@@ -1,30 +1,48 @@
 # Velora
 
-Crypto sentiment dashboard. Live Binance price feed + Nitter tweet scrape, dual-backend sentiment (VADER + DistilBERT), Pearson lag-correlation between sentiment and 1h returns. Grafana dashboards on top.
+Crypto sentiment dashboard. Live Binance prices + dual-source social ingest (Twitter via Nitter, Bluesky via Jetstream firehose), Spark Structured Streaming sentiment compute (VADER + DistilBERT), 4-tier analytics (Descriptive / Diagnostic / Predictive / Prescriptive). Medallion lake: Mongo bronze → Timescale silver+gold. Grafana on top.
 
 > **For boot, install, and troubleshooting → see [SETUP.md](SETUP.md).**
+> **For Spark job → see [spark/README.md](spark/README.md).**
 > **For API contract → see [docs/api.md](docs/api.md).**
 
 ---
 
-## Architecture
+## Architecture (medallion)
 
 ```
-                                  consumer infra (docker)
-                                  TimescaleDB ← schema applied @ container init
-                                       ↑
-producer (machine A)              consumer (machine B)
-─────────────────────             ────────────────────
-binance_producer ──┐               ┌─→ consumers/prices ─┐
-tweet_producer  ──┴─→ Kafka :9092 ─┤                     ├─→ TimescaleDB ─→ aggregator ─→ FastAPI ─→ Grafana
-                                   └─→ consumers/tweets ─┘                       ↑
-                                                                                 │
-                                                                          vader + bert workers
-seed/ (optional, one-shot) ── prices REST → DB direct
-                            └─ tweets Nitter → Kafka → consumer dedupes
+┌─────────────────── PRODUCER (machine A) ───────────────────┐
+│  binance_producer ─────────┐                                │
+│  tweet_producer (Nitter) ──┤                                │
+│  bluesky_producer (Jetstream WS + keyword filter) ──┐       │
+│                            │                        │       │
+│                       Kafka :9092                            │
+└────────────────────────────┬─────────────────────────────────┘
+                             │
+       ┌─────────────────────┼─────────────────────┐
+       │                     │                     │
+       ▼                     ▼                     ▼
+   prices    velora.tweets (3 consumer groups, V41)        velora.sentiment
+       │           │                                          ▲
+       │           ├──→ consumer/tweets ──→ Mongo bronze      │
+       │           └──→ Spark sentiment_stream ─── VADER + BERT
+       ▼                                                       │
+   Timescale prices_1m                          consumer/sentiment ─┘
+       │                                              │
+       └────────────────────┬─────────────────────────┘
+                            ▼
+              Timescale silver (sentiment_scored)
+                            │
+                            ▼
+       Timescale gold ── aggregator + predictor + recommender
+       (aggregates_summary, aggregates_by_source, predictions, recommendations,
+        sentiment_hourly cagg, prices_hourly cagg, coin_live_sentiment)
+                            │
+                            ▼
+                    FastAPI (consumer/api/) ──→ Grafana
 ```
 
-Two-machine pipeline, Kafka-bridged. Producer stateless (no DB). Consumer owns storage + analytics + serving. Schema lives in `seed/schema.sql` and is applied automatically by Postgres init scripts on first volume init (V1, V2). Single-machine dev = everything on localhost.
+**Bronze** = Mongo `raw_tweets` (every raw msg, schemaless, 30d TTL). **Silver** = Timescale `sentiment_scored` (per-tweet score). **Gold** = Timescale aggregates + CAGGs + predictions + recommendations. ⊥ cross-store join @ runtime per V39.
 
 ---
 
@@ -32,53 +50,95 @@ Two-machine pipeline, Kafka-bridged. Producer stateless (no DB). Consumer owns s
 
 | Step | Component | Cadence |
 |------|-----------|---------|
-| Apply schema | `seed/schema.sql` mounted into Timescale `/docker-entrypoint-initdb.d/` | once @ first container init |
-| Optional historical backfill | `seed/` (Binance REST → DB; Nitter → Kafka) | one-shot, idempotent, skip-if-fresh |
-| Pull live OHLCV from Binance | `producer/binance_producer.py` (kline_1m WS) | per closed bar (~60s) |
-| Scrape tweets from Nitter | `producer/tweet_producer.py` (Playwright) | concurrent all coins per 120s |
-| Persist to TimescaleDB | `consumer/consumers/{prices,tweets}.py` | live (tweets dedupe `ON CONFLICT DO NOTHING`) |
-| Score sentiment | `consumer/workers/vader.py` (live) + `bert.py` (batch) | 30s / 5min |
-| Compute lag corr + summary | `consumer/workers/aggregator.py` | 60s |
-| Live sentiment rolling buckets | `consumer/workers/live_sentiment.py` | 60s |
-| DB maintenance | `consumer/workers/maintenance.py` | 6h |
-| Serve via REST | `consumer/api/` (FastAPI, 13 endpoints) | per request |
-| Visualize | Grafana 11 + Infinity datasource | 10–30s refresh |
+| Apply schema | `schema/schema.sql` mounted into Timescale init | once @ first volume init |
+| Mongo init | `schema/01_indexes.js` mounted into Mongo init | once @ first volume init |
+| Optional seed | `seed/` (Binance REST direct, Nitter via Kafka, Bluesky XRPC searchPosts via Kafka) | one-shot, idempotent |
+| Live OHLCV | `producer/binance_producer.py` (kline_1m WS) | per closed bar |
+| Twitter live | `producer/tweet_producer.py` (Nitter Playwright) | concurrent all coins, 120s |
+| Bluesky live | `producer/bluesky_producer.py` (Jetstream WS firehose + keyword filter) | continuous |
+| Bronze ingest | `consumer/consumers/tweets.py` → Mongo upsert | live (V38) |
+| Spark sentiment | `spark/jobs/sentiment_stream.py` — Q1 VADER 30s, Q2 BERT 5min | streaming |
+| Silver ingest | `consumer/consumers/sentiment.py` → `sentiment_scored` UPSERT | live (V41) |
+| Gold aggregator | `consumer/workers/aggregator.py` → `aggregates_summary` + `aggregates_by_source` | 60s |
+| Predictor | `consumer/workers/predictor.py` (numpy ridge, multi-horizon 15/60/240) | 5min |
+| Recommender | `consumer/workers/recommender.py` (rule combiner, V51 reasons) | 5min |
+| Live sentiment | `consumer/workers/live_sentiment.py` (last 100 per coin × source) | 60s |
+| CAGG refresh | `consumer/workers/cagg_refresh.py` | 60s |
+| Maintenance | `consumer/workers/maintenance.py` (VACUUM) | 6h |
+| API | `consumer/api/` (FastAPI, ~21 endpoints incl. predict/recommend/divergence) | per request |
+| Visualize | Grafana 11 + Infinity (4-tier dashboard rows) | 10–30s |
 
 ---
 
-## Why these design choices
+## 4-Tier analytics (V31, V47, V48)
 
-**Kafka over direct DB writes** — producer + consumer can run on different machines. Kafka buffers if consumer crashes. Topics are 6-partition for parallelism. Demos cleanly as "distributed".
+| Tier | Question | Panels |
+|---|---|---|
+| 🟦 **Descriptive** | What happened | price, 24h Δ%, 1h Δ%, posts 24h, hourly sentiment, candle, live tweet feed, per-source post counts |
+| 🟨 **Diagnostic** | Why | lag1/lag2 corr (V+B), correlation scatter, **cross-source divergence**, sentiment-price overlay |
+| 🟧 **Predictive** | What's next | **predicted return % @ 15/60/240min**, confidence, 7d forecast history |
+| 🟥 **Prescriptive** | What to do | **BUY / SELL / HOLD signal** (color-mapped), score gauge, reasons table, 7d signal timeline |
 
-**TimescaleDB over Cassandra/Mongo** — time-series specialty (hypertables auto-partition by time, native retention policies, continuous aggregates handle hourly/daily rollups for free). SQL > CQL for ad-hoc analytics. ~1M writes/day fits this scale; Cassandra would be overkill.
-
-**Asyncio over Spark Streaming** — volume is ~30 msg/min sustained. Spark = 4GB JVM overhead for 1 msg/sec. Pure-Python asyncio handles this on a single core. Spark reserved for batch backtest jobs (not implemented yet).
-
-**VADER + DistilBERT, not just one** —
-- VADER: lexicon-based, ~5ms/tweet, no model load. Live hot path.
-- DistilBERT: transformer, ~50ms/tweet on CPU (~5ms GPU). Batch enricher, runs every 5min.
-- Both compound scores stored side-by-side. API can expose either.
-
-**Public Nitter (`tiekoetter.com`), not self-hosted** — saves a docker service + Redis. Single instance, no fallback. On failure, scraper logs and skips the cycle. Sentiment degrades gracefully.
-
-**Optional seed step** (`seed/`) — one-shot historical backfill: ~24h of 1m klines from Binance REST (direct DB insert) + ~N days of tweets via Nitter date-bounded search (publish to Kafka, consumer dedupes via PK). Idempotent + skip-if-fresh per coin. Run once after boot to skip the cold-start fill window; skip entirely for a true cold-start demo.
-
-**Schema applied automatically** — `seed/schema.sql` mounted into Timescale `/docker-entrypoint-initdb.d/`. Runs on first container init only. Subsequent restarts keep existing data. Schema changes require `down -v` (wipe + re-init) in dev.
+Per-coin signal heatmap on main dashboard.
 
 ---
 
-## Storage layout (TimescaleDB)
+## Sentiment backend toggle (V27)
 
+`SENTIMENT_BACKEND=spark` (default) — Spark Structured Streaming computes sentiment.
+`SENTIMENT_BACKEND=python` — legacy in-process VADER/BERT workers (broken vs. V37; rewrite pending).
+
+Mutually exclusive. Spark image bakes Kafka connector + BERT deps. HF cache volume-mounted (no re-download on restart, V52).
+
+---
+
+## Why Spark for sentiment
+
+VADER alone is fast (~5ms/tweet) and handles ~30 msg/min trivially in Python. Spark added when scale + 2-source ingest + heavy BERT batches require:
+
+- **Backpressure-tolerant streaming** (checkpointed Kafka offsets, exactly-once semantics)
+- **Batched DistilBERT** via pandas-UDF (50ms/tweet on CPU; 64-tweet batches mortar amortize tokenizer cost)
+- **Independent VADER + BERT cadence** (V54 — two writeStream queries, separate checkpoint subdirs)
+- **Compute decoupled from compute** — Mongo bronze ⊥ Spark dependency (V40)
+
+Pure-asyncio path retained as fallback (`SENTIMENT_BACKEND=python`).
+
+---
+
+## Why Mongo for bronze (V36, V37)
+
+Raw tweets are schemaless (Twitter shape ≠ Bluesky shape, future sources will differ again). Mongo is the right tool:
+
+- Schemaless writes — additive fields don't need migrations (V42)
+- Unique idx `(tweet_id, source)` for cheap upsert dedupe (V38)
+- TTL idx for automatic 30d retention
+- Future re-score reads raw text from bronze (no re-scrape)
+
+Timescale stays for time-series compute (silver + gold). Cross-store join ⊥ runtime per V39.
+
+---
+
+## Storage layout
+
+**Mongo bronze** (`velora.raw_tweets`):
+| Idx | Purpose |
+|---|---|
+| `(tweet_id, source)` unique | Upsert dedupe (V38) |
+| `(coin, ts DESC)` | API tweet feed |
+| `ts` TTL 30d | Auto-prune |
+
+**Timescale silver + gold:**
 | Table | Retention | Purpose |
 |-------|-----------|---------|
 | `prices_1m` | 30d | OHLCV bars (hypertable) |
-| `raw_tweets` | 24h | unprocessed scraped tweets |
-| `sentiment_scored` | 7d | per-tweet dual-backend scores |
-| `sentiment_hourly` | 7d (cont. aggregate) | hourly sentiment rollup |
-| `prices_hourly` | 30d (cont. aggregate) | hourly OHLCV rollup |
-| `aggregates_summary` | – | one row per coin, refreshed by aggregator |
-
-Retention enforced by Timescale automatically (`add_retention_policy`). Continuous aggregates auto-refresh every 1–5 min in background. No cron needed.
+| `sentiment_scored` | 7d | per-tweet dual-backend scores (PK incl. source) |
+| `sentiment_hourly` | cagg | hourly rollup, grouped by (coin, source, bucket) |
+| `prices_hourly` | cagg | hourly OHLCV rollup |
+| `aggregates_summary` | – | per-coin combined headline (PK coin) |
+| `aggregates_by_source` | – | per-coin per-source diagnostic (PK coin, source) |
+| `coin_live_sentiment` | 7d | rolling last-100 per (coin, source) |
+| `predictions` | 7d | per-(coin, ts, horizon) predicted returns |
+| `recommendations` | 7d | per-(coin, ts) signal + reasons[] |
 
 ---
 
@@ -87,48 +147,50 @@ Retention enforced by Timescale automatically (`add_retention_policy`). Continuo
 ```
 velora/
 ├── docker-compose.producer.yml     zookeeper + kafka
-├── docker-compose.consumer.yml     timescaledb (schema auto-applied) + grafana
-├── .env / .env.example              shared per-machine config
-├── producer/                        Binance WS + Nitter scraper → Kafka
-├── consumer/                        Kafka → TimescaleDB + sentiment + FastAPI
-├── seed/                            schema + optional historical backfill
-│   └── schema.sql                  mounted into Timescale init dir
-├── shared/                          coins registry, kafka topics, pydantic schemas
-├── monitoring/grafana/              dashboards + datasource provisioning
-├── docs/api.md                      API response contract (source of truth)
-├── SETUP.md                         install + boot + ops + troubleshoot
-├── SPEC.md                          machine-readable spec (cavekit format)
-├── logic/                           reference (old Spark sentiment pipeline)
-└── test/                            reference (Node prototypes for binance ws + nitter)
+├── docker-compose.consumer.yml     timescale + mongo + grafana (schema auto-applied)
+├── docker-compose.spark.yml        spark master + worker + sentiment_stream submit
+├── schema/                          schema.sql (Timescale) + 01_indexes.js (Mongo)
+├── .env / .env.example
+├── producer/                        Binance WS + Nitter + Bluesky → Kafka
+├── consumer/                        Kafka → Mongo bronze + Timescale silver/gold + FastAPI
+│   ├── consumers/{prices,tweets,sentiment}.py
+│   ├── workers/{aggregator,live_sentiment,cagg_refresh,maintenance,predictor,recommender,vader,bert}.py
+│   ├── api/                         FastAPI routers
+│   ├── db.py                        asyncpg pool
+│   └── db_mongo.py                  motor client
+├── spark/                           Structured Streaming sentiment compute
+│   ├── jobs/sentiment_stream.py
+│   ├── preprocess.py
+│   ├── Dockerfile.spark
+│   └── README.md
+├── seed/                            optional one-shot backfill (Binance REST + Nitter + Bluesky XRPC)
+├── shared/                          coins, kafka topics, pydantic schemas, queries
+├── monitoring/grafana/              dashboards (4-tier) + datasource provisioning
+├── docs/api.md                      API response contract
+├── SETUP.md                         install + boot + ops
+└── SPEC.md                          machine-readable spec (cavekit)
 ```
 
 ---
 
 ## Tracked coins
 
-Hard-coded in `shared/coins.py`. Currently 6: bitcoin, ethereum, solana, ripple, binance (BNB), dogecoin. Add more by editing the `COINS` tuple — producer + consumer + Grafana variable pick up automatically.
-
-```python
-CoinSpec("cardano", "ADA", "Cardano", "ADAUSDT", "cardano"),
-```
+Hard-coded in `shared/coins.py`. Currently 6: bitcoin, ethereum, solana, ripple, binance, dogecoin. Keywords for matching live in `shared/queries.py`. Add coins by editing both — producer (Bluesky filter, Nitter search), seed (Bluesky search query), aggregator/predictor/recommender (loop over `COIN_NAMES`), and Grafana variable all pick up automatically.
 
 ---
 
-## Tunables (`.env`)
+## Tunables (`.env`) — major
 
 | Var | Default | Effect |
 |-----|---------|--------|
-| `TWEET_POLL_INTERVAL_SECONDS` | 120 | Rotation cadence (one coin per tick) |
-| `TWEETS_PER_SCRAPE` | 100 | Tweets fetched per coin per cycle |
-| `TWEET_MAX_PAGES` | 12 | Nitter "Load more" pagination cap |
-| `PLAYWRIGHT_TIMEOUT_MS` | 45000 | Per-page nav timeout |
-| `TWEET_BACKFILL_DAYS` | 2 | Seed: days of historical scrape per coin |
-| `TWEET_BACKFILL_MAX_PER_DAY` | 600 | Seed: tweet cap per coin per day |
-| `VADER_INTERVAL_SECONDS` | 30 | VADER scoring loop |
-| `BERT_INTERVAL_SECONDS` | 300 | DistilBERT enrichment loop |
-| `BERT_ENABLED` | true | Set false to skip BERT entirely |
-| `AGGREGATOR_INTERVAL_SECONDS` | 60 | Lag corr + summary refresh |
-| `HOST_LAN_IP` | localhost | Producer machine's LAN IP (cross-machine) |
-| `KAFKA_BROKER` | localhost:9092 | Consumer's broker target (cross-machine) |
+| `SENTIMENT_BACKEND` | spark | spark|python |
+| `BLUESKY_JETSTREAM_URL` | jetstream1.us-east | WS firehose endpoint |
+| `BLUESKY_PUBLIC_API_URL` | public.api.bsky.app | XRPC searchPosts (seed only) |
+| `SPARK_VADER_TRIGGER_SECONDS` | 30 | VADER stream cadence |
+| `SPARK_BERT_TRIGGER_SECONDS` | 300 | BERT stream cadence |
+| `BERT_BATCH_SIZE` | 64 | BERT pandas-UDF batch |
+| `PREDICT_HORIZONS` | 15,60,240 | Predict horizons (minutes) |
+| `PREDICT_INTERVAL_SECONDS` | 300 | Predictor tick |
+| `RECOMMEND_INTERVAL_SECONDS` | 300 | Recommender tick |
 
-Boot, verify, ops, and troubleshooting → **[SETUP.md](SETUP.md)**.
+Full list in `.env.example`. Boot, verify, ops, troubleshooting → **[SETUP.md](SETUP.md)**.

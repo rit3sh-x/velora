@@ -7,6 +7,7 @@ networks:
 volumes:
   timescale-data:
   grafana-data:
+  mongo-data:
 
 services:
   timescaledb:
@@ -21,9 +22,24 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-velora}
     volumes:
       - timescale-data:/var/lib/postgresql/data
-      - ./seed/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./schema/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-velora} -d ${POSTGRES_DB:-velora}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mongodb:
+    image: mongo:7
+    container_name: velora-mongodb
+    networks: [velora-consumer-net]
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+      - ./schema:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -48,6 +64,8 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       timescaledb:
+        condition: service_healthy
+      mongodb:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O - http://localhost:3000/api/health | grep -q '\"database\": *\"ok\"' || exit 1"]

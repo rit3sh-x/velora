@@ -1,11 +1,3 @@
-"""One-shot seed runner. Run AFTER consumer + producer are up.
-
-    uv run python -m seed
-
-Connects to Postgres for prices backfill (DB-direct).
-Connects to Kafka for tweets backfill (publishes events; consumer ingests).
-Both seeders are idempotent and skip-if-fresh.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -19,6 +11,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 from consumer.db import init_pool, close_pool
 from producer.kafka_client import close_producer
+from seed.bluesky import backfill_bluesky
 from seed.prices import backfill_prices
 from seed.tweets import backfill_tweets
 
@@ -30,13 +23,17 @@ async def main() -> None:
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    log.info("seed: prices first (DB direct), then tweets (Kafka)")
+    log.info("seed: prices first (DB direct), then twitter+bluesky (Kafka, parallel)")
 
     pool = await init_pool()
     try:
         await backfill_prices(pool)
         try:
-            await backfill_tweets(pool)
+            await asyncio.gather(
+                backfill_tweets(pool),
+                backfill_bluesky(),
+                return_exceptions=True,
+            )
         finally:
             try:
                 close_producer()

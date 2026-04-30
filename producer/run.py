@@ -1,14 +1,3 @@
-"""Velora producer entry point.
-
-Runs the Binance WS consumer and the Nitter tweet rotator concurrently
-under one asyncio event loop. Both publish to Kafka.
-
-Data seeding lives in the `seed/` package and is run separately:
-    uv run python -m seed
-
-Run with:
-    cd producer && uv run python run.py
-"""
 from __future__ import annotations
 
 import sys
@@ -21,7 +10,7 @@ if str(_REPO_ROOT) not in sys.path:
 import asyncio
 import logging
 
-from producer import binance_producer, tweet_producer
+from producer import binance_producer, bluesky_producer, tweet_producer
 from producer.kafka_client import close_producer
 
 log = logging.getLogger("velora.producer.run")
@@ -38,7 +27,8 @@ async def _main() -> None:
     log.info("starting velora producer")
     tasks = [
         asyncio.create_task(binance_producer.run(), name="binance"),
-        asyncio.create_task(tweet_producer.run(), name="tweets"),
+        asyncio.create_task(tweet_producer.run(), name="twitter"),
+        asyncio.create_task(bluesky_producer.run(), name="bluesky"),
     ]
     try:
         await asyncio.gather(*tasks)

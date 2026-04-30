@@ -1,0 +1,18 @@
+[project]
+name = "velora-spark"
+version = "0.1.0"
+description = "Velora Spark Structured Streaming sentiment job"
+requires-python = ">=3.11"
+dependencies = [
+    "pyspark>=3.5.0,<3.6",
+    "vaderSentiment>=3.3.2",
+    "transformers>=4.45.0",
+    "torch>=2.4.0",
+    "emoji>=2.10.0",
+    "langdetect>=1.0.9",
+    "pandas>=2.2.0",
+    "numpy>=2.1.0",
+]
+
+[tool.uv]
+package = false

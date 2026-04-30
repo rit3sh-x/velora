@@ -1,14 +1,3 @@
-"""Velora consumer supervisor.
-
-Boot order:
-  1. init asyncpg pool (schema applied by docker init scripts on first volume init)
-  2. spawn long-running tasks: prices, tweets, vader, bert, aggregator,
-     live_sentiment, cagg_refresh, maintenance
-  3. host uvicorn for the FastAPI app
-
-Data seeding lives in the `seed/` package and is run separately:
-  uv run python -m seed
-"""
 from __future__ import annotations
 
 import asyncio
@@ -24,9 +13,19 @@ import uvicorn
 
 from consumer.api.main import app
 from consumer.config import settings
-from consumer.consumers import prices, tweets
+from consumer.consumers import prices, sentiment, tweets
 from consumer.db import close_pool, init_pool
-from consumer.workers import aggregator, bert, cagg_refresh, live_sentiment, maintenance, vader
+from consumer.db_mongo import close_mongo, init_mongo
+from consumer.workers import (
+    aggregator,
+    bert,
+    cagg_refresh,
+    live_sentiment,
+    maintenance,
+    predictor,
+    recommender,
+    vader,
+)
 
 
 async def main() -> None:
@@ -36,8 +35,9 @@ async def main() -> None:
     )
     log = logging.getLogger("velora")
 
-    log.info("initializing db pool...")
+    log.info("initializing pg pool + mongo client...")
     pool = await init_pool()
+    await init_mongo()
 
     log.info("spawning workers + uvicorn on %s:%d", settings.api_host, settings.api_port)
 
@@ -51,15 +51,24 @@ async def main() -> None:
 
     tasks = [
         asyncio.create_task(prices.run(pool), name="prices"),
-        asyncio.create_task(tweets.run(pool), name="tweets"),
-        asyncio.create_task(vader.run(pool), name="vader"),
-        asyncio.create_task(bert.run(pool), name="bert"),
+        asyncio.create_task(tweets.run(), name="tweets_bronze"),
         asyncio.create_task(aggregator.run(pool), name="aggregator"),
         asyncio.create_task(live_sentiment.run(pool), name="live_sentiment"),
         asyncio.create_task(cagg_refresh.run(pool), name="cagg_refresh"),
         asyncio.create_task(maintenance.run(pool), name="maintenance"),
+        asyncio.create_task(predictor.run(pool), name="predictor"),
+        asyncio.create_task(recommender.run(pool), name="recommender"),
         asyncio.create_task(server.serve(), name="api"),
     ]
+    if settings.sentiment_backend == "spark":
+        log.info("sentiment_backend=spark: ingesting velora.sentiment from Kafka")
+        tasks.append(asyncio.create_task(sentiment.run(pool), name="sentiment_silver"))
+    else:
+        log.info("sentiment_backend=python: spawning legacy VADER+BERT workers (broken vs V37 — needs rewrite)")
+        tasks.extend([
+            asyncio.create_task(vader.run(pool), name="vader"),
+            asyncio.create_task(bert.run(pool), name="bert"),
+        ])
 
     try:
         await asyncio.gather(*tasks)
@@ -70,6 +79,7 @@ async def main() -> None:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
         await close_pool()
+        await close_mongo()
 
 
 if __name__ == "__main__":

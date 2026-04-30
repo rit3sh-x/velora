@@ -1,6 +1,6 @@
 {
   "uid": "velora-coin",
-  "title": "Velora \u00e2\u20ac\u201d Coin Detail",
+  "title": "Velora - Coin Detail",
   "description": "Per-coin OHLCV, sentiment, lag-correlation and tweets, time-synced via shared crosshair. Tweets follow the dashboard time picker.",
   "tags": [
     "velora",
@@ -85,7 +85,7 @@
     {
       "id": 100,
       "type": "row",
-      "title": "Live Snapshot",
+      "title": "🟦 DESCRIPTIVE | current snapshot",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -200,7 +200,7 @@
           "columns": [
             {
               "selector": "change_24h_pct",
-              "text": "\u00ce\u201d 24h",
+              "text": "delta 24h",
               "type": "number"
             }
           ],
@@ -502,7 +502,7 @@
     {
       "id": 101,
       "type": "row",
-      "title": "Lag Correlation (sentiment ahead of price return)",
+      "title": "🟨 DIAGNOSTIC | why (lag correlation)",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -650,7 +650,7 @@
       "id": 7,
       "type": "stat",
       "title": "VADER L1",
-      "description": "Pearson corr between VADER sentiment shifted 1 bucket and bucket return. Needs \u00e2\u2030\u00a5 3 samples.",
+      "description": "Pearson corr between VADER sentiment shifted 1 bucket and bucket return. Needs â‰¥ 3 samples.",
       "gridPos": {
         "x": 8,
         "y": 6,
@@ -708,7 +708,7 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "\u00e2\u20ac\u201d",
+          "noValue": "-",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -804,7 +804,7 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "\u00e2\u20ac\u201d",
+          "noValue": "-",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -900,7 +900,7 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "\u00e2\u20ac\u201d",
+          "noValue": "-",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -996,7 +996,7 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "\u00e2\u20ac\u201d",
+          "noValue": "-",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1033,7 +1033,7 @@
     {
       "id": 102,
       "type": "row",
-      "title": "Market Action \u00e2\u20ac\u201d synced crosshair (hover any chart)",
+      "title": "🟦 DESCRIPTIVE | market action",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1046,7 +1046,7 @@
     {
       "id": 10,
       "type": "candlestick",
-      "title": "${coin} \u00e2\u20ac\u201d OHLC + EMA12 / EMA26 / SMA20 / SMA50",
+      "title": "${coin} - OHLC + EMA12 / EMA26 / SMA20 / SMA50",
       "description": "1m candles + four MAs. EMA12 (orange) / EMA26 (cyan) momentum; SMA20 (yellow dashed) / SMA50 (gray dashed) trend.",
       "gridPos": {
         "x": 0,
@@ -1271,7 +1271,7 @@
       "id": 18,
       "type": "timeseries",
       "title": "Volume (1m)",
-      "description": "Per-minute traded volume. Aligns with the candles above \u00e2\u20ac\u201d use shared crosshair.",
+      "description": "Per-minute traded volume. Aligns with the candles above - use shared crosshair.",
       "gridPos": {
         "x": 0,
         "y": 32,
@@ -1346,8 +1346,8 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Price \u00e2\u2020\u201d Sentiment (hourly, 7d) \u00e2\u20ac\u201d left axis $, right axis \u00c2\u00b11",
-      "description": "Solid blue = hourly close price (left, USD). Solid purple/blue = VADER / BERT compound sentiment (right, [-1, 1]). Dotted = sentiment shifted 1h / 2h ahead \u00e2\u20ac\u201d toggle in legend to see if sentiment leads price. Watch for sentiment spikes preceding price spikes. Pink/cyan lines = rolling avg over last 100 tweets/coin (refreshed every 60s; covers gaps when scraper is bursty). Hover for sample size + age \u00e2\u20ac\u201d older than 30min suggests scraper lag.",
+      "title": "Price <-> Sentiment (hourly, 7d) - left axis $, right axis +/-1",
+      "description": "Solid blue = hourly close price (left, USD). Solid purple/blue = VADER / BERT compound sentiment (right, [-1, 1]). Dotted = sentiment shifted 1h / 2h ahead - toggle in legend to see if sentiment leads price. Watch for sentiment spikes preceding price spikes. Pink/cyan lines = rolling avg over last 100 tweets/coin (refreshed every 60s; covers gaps when scraper is bursty). Hover for sample size + age - older than 30min suggests scraper lag.",
       "gridPos": {
         "x": 0,
         "y": 11,
@@ -1919,7 +1919,7 @@
       "id": 19,
       "type": "timeseries",
       "title": "Tweet volume + sentiment mix (hourly)",
-      "description": "Stacked positive/neutral/negative tweet counts per hour. Shows when conversation spikes \u00e2\u20ac\u201d align with price spikes above via shared crosshair.",
+      "description": "Stacked positive/neutral/negative tweet counts per hour. Shows when conversation spikes - align with price spikes above via shared crosshair.",
       "gridPos": {
         "x": 0,
         "y": 36,
@@ -2052,7 +2052,7 @@
     {
       "id": 105,
       "type": "row",
-      "title": "Tweets \u00e2\u20ac\u201d follow dashboard time window",
+      "title": "🟦 DESCRIPTIVE | recent tweets",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -2066,7 +2066,7 @@
       "id": 17,
       "type": "table",
       "title": "Tweets in selected time window",
-      "description": "Tweets posted within the dashboard time picker. Zoom or pan the candles \u00e2\u2020\u2019 this list updates.",
+      "description": "Tweets posted within the dashboard time picker. Zoom or pan the candles -> this list updates.",
       "gridPos": {
         "x": 0,
         "y": 42,
@@ -2617,6 +2617,746 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "id": 204,
+      "type": "row",
+      "title": "🟨 DIAGNOSTIC | cross-source divergence",
+      "gridPos": {
+        "x": 0,
+        "y": 62,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 210,
+      "type": "timeseries",
+      "title": "Cross-source sentiment divergence (twitter vs bluesky)",
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "A",
+          "type": "json",
+          "source": "url",
+          "format": "timeseries",
+          "url": "http://host.docker.internal:8000/coin/${coin}/divergence?days=7",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "ts",
+              "text": "ts",
+              "type": "timestamp"
+            },
+            {
+              "selector": "v_twitter",
+              "text": "v_twitter",
+              "type": "number"
+            },
+            {
+              "selector": "v_bluesky",
+              "text": "v_bluesky",
+              "type": "number"
+            },
+            {
+              "selector": "divergence",
+              "text": "divergence",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "pointSize": 5
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 202,
+      "type": "row",
+      "title": "🟧 PREDICTIVE | short-horizon return forecast",
+      "gridPos": {
+        "x": 0,
+        "y": 71,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 220,
+      "type": "stat",
+      "title": "15-min predicted return %",
+      "gridPos": {
+        "x": 0,
+        "y": 72,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "P0",
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "http://host.docker.internal:8000/coin/${coin}/predict?horizon=15",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "predicted_return_pct",
+              "text": "value",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 221,
+      "type": "stat",
+      "title": "60-min predicted return %",
+      "gridPos": {
+        "x": 8,
+        "y": 72,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "P1",
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "http://host.docker.internal:8000/coin/${coin}/predict?horizon=60",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "predicted_return_pct",
+              "text": "value",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 222,
+      "type": "stat",
+      "title": "240-min predicted return %",
+      "gridPos": {
+        "x": 16,
+        "y": 72,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "P2",
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "http://host.docker.internal:8000/coin/${coin}/predict?horizon=240",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "predicted_return_pct",
+              "text": "value",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 223,
+      "type": "timeseries",
+      "title": "60-min forecast history (last 7d) + confidence",
+      "gridPos": {
+        "x": 0,
+        "y": 77,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "PH",
+          "type": "json",
+          "source": "url",
+          "format": "timeseries",
+          "url": "http://host.docker.internal:8000/coin/${coin}/predict-history?horizon=60&days=7",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "ts",
+              "text": "ts",
+              "type": "timestamp"
+            },
+            {
+              "selector": "predicted_return_pct",
+              "text": "predicted_return_pct",
+              "type": "number"
+            },
+            {
+              "selector": "confidence",
+              "text": "confidence",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "pointSize": 5
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 203,
+      "type": "row",
+      "title": "🟥 PRESCRIPTIVE | recommended action",
+      "gridPos": {
+        "x": 0,
+        "y": 86,
+        "w": 24,
+        "h": 1
+      },
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "id": 230,
+      "type": "stat",
+      "title": "Signal",
+      "gridPos": {
+        "x": 0,
+        "y": 87,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "S",
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "http://host.docker.internal:8000/coin/${coin}/recommend",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "signal",
+              "text": "signal",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "buy": {
+                  "color": "green",
+                  "index": 0,
+                  "text": "BUY ▲"
+                },
+                "sell": {
+                  "color": "red",
+                  "index": 1,
+                  "text": "SELL ▼"
+                },
+                "hold": {
+                  "color": "yellow",
+                  "index": 2,
+                  "text": "HOLD —"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto",
+        "colorMode": "value",
+        "orientation": "auto"
+      }
+    },
+    {
+      "id": 231,
+      "type": "gauge",
+      "title": "Score (-1 = sell ▼ | +1 = buy ▲)",
+      "gridPos": {
+        "x": 8,
+        "y": 87,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "G",
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "http://host.docker.internal:8000/coin/${coin}/recommend",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "score",
+              "text": "score",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": -1,
+          "max": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": -0.4
+              },
+              {
+                "color": "green",
+                "value": 0.4
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      }
+    },
+    {
+      "id": 232,
+      "type": "table",
+      "title": "Reasons (V51)",
+      "gridPos": {
+        "x": 16,
+        "y": 87,
+        "w": 8,
+        "h": 6
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "R",
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "http://host.docker.internal:8000/coin/${coin}/recommend",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "reasons",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "feature",
+              "text": "feature",
+              "type": "string"
+            },
+            {
+              "selector": "value",
+              "text": "value",
+              "type": "number"
+            },
+            {
+              "selector": "sign",
+              "text": "sign",
+              "type": "number"
+            },
+            {
+              "selector": "contribution",
+              "text": "contribution",
+              "type": "number"
+            },
+            {
+              "selector": "note",
+              "text": "note",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        }
+      }
+    },
+    {
+      "id": 233,
+      "type": "timeseries",
+      "title": "Signal score history (last 7d)",
+      "gridPos": {
+        "x": 0,
+        "y": 93,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "infinity-velora"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "infinity-velora"
+          },
+          "refId": "SH",
+          "type": "json",
+          "source": "url",
+          "format": "timeseries",
+          "url": "http://host.docker.internal:8000/coin/${coin}/recommend-history?days=7",
+          "url_options": {
+            "data": "",
+            "method": "GET"
+          },
+          "parser": "backend",
+          "root_selector": "",
+          "filters": [],
+          "columns": [
+            {
+              "selector": "ts",
+              "text": "ts",
+              "type": "timestamp"
+            },
+            {
+              "selector": "score",
+              "text": "score",
+              "type": "number"
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "pointSize": 5
+          },
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
       }
     }
   ]

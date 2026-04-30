@@ -1,8 +1,3 @@
-"""Tweet producer.
-
-Round-robins through the 6 coins, scraping one per `tweet_poll_interval_seconds`.
-Publishes each tweet as a `TweetEvent` to the `velora.tweets` topic.
-"""
 from __future__ import annotations
 
 import producer
@@ -15,7 +10,8 @@ from typing import Any
 from producer.config import settings
 from producer.kafka_client import publish
 from producer.playwright_scraper import scrape_coin
-from shared.coins import BY_COIN, COIN_NAMES
+from shared.coins import COIN_NAMES
+from shared.queries import search_query
 from shared.schemas import TweetEvent
 from shared.topics import TWEETS
 
@@ -48,6 +44,7 @@ def _to_event(coin: str, raw: dict[str, Any], scraped_at: datetime) -> TweetEven
         ts=_parse_tweet_date(raw.get("date")),
         scraped_at=scraped_at,
         text=raw.get("text") or "",
+        source="twitter",
         username=raw.get("username"),
         likes=int(raw.get("likes", 0) or 0),
         retweets=int(raw.get("retweets", 0) or 0),
@@ -57,10 +54,9 @@ def _to_event(coin: str, raw: dict[str, Any], scraped_at: datetime) -> TweetEven
 
 
 async def _scrape_and_publish(coin: str) -> int:
-    spec = BY_COIN[coin]
     raw_tweets = await scrape_coin(
         coin=coin,
-        query=spec.nitter_query,
+        query=search_query(coin),
         instance=settings.nitter_url,
         limit=settings.tweets_per_scrape,
         timeout_ms=settings.playwright_timeout_ms,
