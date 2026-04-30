@@ -142,32 +142,34 @@ def _build_signal(agg: asyncpg.Record | None, pred: asyncpg.Record | None) -> tu
     return signal, max(-1.0, min(1.0, score)), reasons
 
 
-async def _recommend_coin(conn: asyncpg.Connection, coin: str) -> str | None:
-    agg = await conn.fetchrow(_AGG_SQL, coin)
-    pred = await conn.fetchrow(_PRED_SQL, coin, _PREDICT_HORIZON_FOR_SIGNAL)
+async def _recommend_coin(pool: asyncpg.Pool, coin: str) -> str | None:
+    async with pool.acquire() as conn:
+        agg = await conn.fetchrow(_AGG_SQL, coin)
+        pred = await conn.fetchrow(_PRED_SQL, coin, _PREDICT_HORIZON_FOR_SIGNAL)
 
-    if agg is None and pred is None:
-        log.debug("recommender[%s]: no input data; skip", coin)
-        return None
+        if agg is None and pred is None:
+            log.debug("recommender[%s]: no input data; skip", coin)
+            return None
 
-    signal, score, reasons = _build_signal(agg, pred)
-    await conn.execute(_INSERT_SQL, coin, signal, score, json.dumps(reasons))
+        signal, score, reasons = _build_signal(agg, pred)
+        await conn.execute(_INSERT_SQL, coin, signal, score, json.dumps(reasons))
     return signal
 
 
 async def _tick(pool: asyncpg.Pool) -> None:
-    async with pool.acquire() as conn:
-        signals: dict[str, int] = {"buy": 0, "sell": 0, "hold": 0}
-        for coin in COIN_NAMES:
-            try:
-                sig = await _recommend_coin(conn, coin)
-                if sig is not None:
-                    signals[sig] = signals.get(sig, 0) + 1
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("recommender: failed coin=%s", coin)
-        log.info("recommender: %s", signals)
+    results = await asyncio.gather(
+        *(_recommend_coin(pool, coin) for coin in COIN_NAMES),
+        return_exceptions=True,
+    )
+    signals: dict[str, int] = {"buy": 0, "sell": 0, "hold": 0}
+    for coin, r in zip(COIN_NAMES, results):
+        if isinstance(r, asyncio.CancelledError):
+            raise r
+        if isinstance(r, BaseException):
+            log.exception("recommender: failed coin=%s", coin, exc_info=r)
+        elif r is not None:
+            signals[r] = signals.get(r, 0) + 1
+    log.info("recommender: %s", signals)
 
 
 async def run(pool: asyncpg.Pool) -> None:

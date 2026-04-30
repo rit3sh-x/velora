@@ -88,10 +88,33 @@ def _add_indicators(df: pd.DataFrame) -> pd.DataFrame:
     df["sma50"] = close.rolling(50, min_periods=1).mean()
     return df
 
+import time as _time
+
+_CACHE: dict[str, tuple[float, Any]] = {}
+_CACHE_TTL_SEC = 30.0
+
+
+def _cache_get(key: str) -> Any | None:
+    entry = _CACHE.get(key)
+    if entry is None:
+        return None
+    expires_at, value = entry
+    if _time.monotonic() > expires_at:
+        _CACHE.pop(key, None)
+        return None
+    return value
+
+
+def _cache_set(key: str, value: Any) -> None:
+    _CACHE[key] = (_time.monotonic() + _CACHE_TTL_SEC, value)
+
 
 @router.get("/coins")
 async def list_coins(pool: asyncpg.Pool = Depends(db)) -> list[dict[str, Any]]:
     """List all coins with current snapshot from aggregates_summary."""
+    cached = _cache_get("coins")
+    if cached is not None:
+        return cached
     rows = await pool.fetch(
         """
         SELECT coin, last_price, change_24h_pct, volume_24h
@@ -113,6 +136,7 @@ async def list_coins(pool: asyncpg.Pool = Depends(db)) -> list[dict[str, Any]]:
                 "volume_24h": _clean(s.get("volume_24h")) or 0.0,
             }
         )
+    _cache_set("coins", out)
     return out
 
 
@@ -142,6 +166,9 @@ async def search(
 @router.get("/global")
 async def global_stats(pool: asyncpg.Pool = Depends(db)) -> dict[str, Any]:
     """Aggregate sentiment across all coins. avg_sentiment is post-weighted."""
+    cached = _cache_get("global")
+    if cached is not None:
+        return cached
     rows = await pool.fetch(
         """
         SELECT coin, total_posts_24h, avg_sentiment_24h,
@@ -172,17 +199,22 @@ async def global_stats(pool: asyncpg.Pool = Depends(db)) -> dict[str, Any]:
         positive_pct = 0.0
         negative_pct = 0.0
 
-    return {
+    out = {
         "total_posts": int(total_posts),
         "avg_sentiment": round(avg_sentiment, 4),
         "positive_pct": round(positive_pct, 2),
         "negative_pct": round(negative_pct, 2),
     }
+    _cache_set("global", out)
+    return out
 
 
 @router.get("/rankings")
 async def rankings(pool: asyncpg.Pool = Depends(db)) -> list[dict[str, Any]]:
     """Coins ranked by post volume desc."""
+    cached = _cache_get("rankings")
+    if cached is not None:
+        return cached
     rows = await pool.fetch(
         """
         SELECT coin, total_posts_24h, avg_sentiment_24h
@@ -190,7 +222,7 @@ async def rankings(pool: asyncpg.Pool = Depends(db)) -> list[dict[str, Any]]:
         ORDER BY total_posts_24h DESC NULLS LAST
         """
     )
-    return [
+    out = [
         {
             "coin": r["coin"],
             "post_volume": int(r["total_posts_24h"] or 0),
@@ -198,11 +230,16 @@ async def rankings(pool: asyncpg.Pool = Depends(db)) -> list[dict[str, Any]]:
         }
         for r in rows
     ]
+    _cache_set("rankings", out)
+    return out
 
 
 @router.get("/trending")
 async def trending(pool: asyncpg.Pool = Depends(db)) -> list[dict[str, Any]]:
     """Top movers in the last 1h, sorted by abs(change_1h_pct) desc."""
+    cached = _cache_get("trending")
+    if cached is not None:
+        return cached
     rows = await pool.fetch(
         """
         SELECT coin, last_price, change_1h_pct, volume_1h
@@ -225,6 +262,7 @@ async def trending(pool: asyncpg.Pool = Depends(db)) -> list[dict[str, Any]]:
                 "volume_1h": _clean(r["volume_1h"]) or 0.0,
             }
         )
+    _cache_set("trending", out)
     return out
 
 

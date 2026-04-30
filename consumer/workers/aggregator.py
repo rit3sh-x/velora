@@ -272,24 +272,27 @@ async def _update_per_source(conn: asyncpg.Connection, coin: str, source: str) -
     )
 
 
-async def _update_coin(conn: asyncpg.Connection, coin: str) -> None:
-    await _update_combined(conn, coin)
-    for source in _SOURCES:
-        try:
-            await _update_per_source(conn, coin, source)
-        except Exception:
-            log.exception("aggregator: per-source failed coin=%s source=%s", coin, source)
+async def _update_coin(pool: asyncpg.Pool, coin: str) -> None:
+    """Acquire own connection so concurrent coins parallelize across pool."""
+    async with pool.acquire() as conn:
+        await _update_combined(conn, coin)
+        for source in _SOURCES:
+            try:
+                await _update_per_source(conn, coin, source)
+            except Exception:
+                log.exception("aggregator: per-source failed coin=%s source=%s", coin, source)
 
 
 async def _tick(pool: asyncpg.Pool) -> None:
-    async with pool.acquire() as conn:
-        for coin in COIN_NAMES:
-            try:
-                await _update_coin(conn, coin)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("aggregator: failed for coin=%s", coin)
+    results = await asyncio.gather(
+        *(_update_coin(pool, coin) for coin in COIN_NAMES),
+        return_exceptions=True,
+    )
+    for coin, r in zip(COIN_NAMES, results):
+        if isinstance(r, asyncio.CancelledError):
+            raise r
+        if isinstance(r, BaseException):
+            log.exception("aggregator: failed for coin=%s", coin, exc_info=r)
     log.info("aggregator: refreshed %d coins × (combined + %d sources)",
              len(COIN_NAMES), len(_SOURCES))
 

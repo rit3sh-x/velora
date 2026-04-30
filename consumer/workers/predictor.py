@@ -145,36 +145,45 @@ def _train_predict(df: pd.DataFrame, horizon_minutes: int) -> tuple[float | None
     return pred, confidence
 
 
-async def _predict_coin(conn: asyncpg.Connection, coin: str) -> int:
-    rows = await conn.fetch(_FEATURE_SQL, coin)
+async def _predict_coin(pool: asyncpg.Pool, coin: str) -> int:
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(_FEATURE_SQL, coin)
     df = _build_features(list(rows))
     if df is None:
         log.debug("predictor[%s]: insufficient samples", coin)
         return 0
 
     horizons = settings.predict_horizons_list
-    written = 0
+    pending: list[tuple] = []
     for h in horizons:
         pred, conf = _train_predict(df, h)
         if pred is None:
             continue
-        await conn.execute(_INSERT_SQL, coin, h, pred, conf, _MODEL_VERSION)
-        written += 1
-    return written
+        pending.append((coin, h, pred, conf, _MODEL_VERSION))
+
+    if not pending:
+        return 0
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.executemany(_INSERT_SQL, pending)
+    return len(pending)
 
 
 async def _tick(pool: asyncpg.Pool) -> None:
-    async with pool.acquire() as conn:
-        total = 0
-        for coin in COIN_NAMES:
-            try:
-                total += await _predict_coin(conn, coin)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                log.exception("predictor: failed coin=%s", coin)
-        log.info("predictor: wrote %d prediction rows across %d coins",
-                 total, len(COIN_NAMES))
+    results = await asyncio.gather(
+        *(_predict_coin(pool, coin) for coin in COIN_NAMES),
+        return_exceptions=True,
+    )
+    total = 0
+    for coin, r in zip(COIN_NAMES, results):
+        if isinstance(r, asyncio.CancelledError):
+            raise r
+        if isinstance(r, BaseException):
+            log.exception("predictor: failed coin=%s", coin, exc_info=r)
+        else:
+            total += r
+    log.info("predictor: wrote %d prediction rows across %d coins",
+             total, len(COIN_NAMES))
 
 
 async def run(pool: asyncpg.Pool) -> None:

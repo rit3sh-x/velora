@@ -51,15 +51,14 @@ def _build_consumer() -> KafkaConsumer:
     )
 
 
-async def _handle_record(conn: asyncpg.Connection, raw_value: object) -> None:
+def _record_to_params(raw_value: object) -> tuple | None:
+    """Parse one Kafka record into UPSERT params tuple. None on parse error."""
     try:
         event = SentimentEvent.model_validate(raw_value)
     except ValidationError as exc:
         log.warning("sentiment parse error: %s | payload=%r", exc, raw_value)
-        return
-
-    await conn.execute(
-        UPSERT_SQL,
+        return None
+    return (
         event.tweet_id,
         event.ts,
         event.source,
@@ -72,12 +71,14 @@ async def _handle_record(conn: asyncpg.Connection, raw_value: object) -> None:
         event.scored_at_bert,
     )
 
-    if event.compound_vader is not None:
-        log.debug("vader %s/%s coin=%s c=%.3f", event.tweet_id, event.source,
-                  event.coin, event.compound_vader)
-    if event.compound_bert is not None:
-        log.debug("bert %s/%s coin=%s c=%.3f", event.tweet_id, event.source,
-                  event.coin, event.compound_bert)
+
+async def _flush_batch(conn: asyncpg.Connection, params_list: list[tuple]) -> None:
+    """Batch-execute UPSERTs in a single transaction (≤1 round-trip per batch)."""
+    if not params_list:
+        return
+    async with conn.transaction():
+        await conn.executemany(UPSERT_SQL, params_list)
+    log.debug("sentiment silver upsert batch=%d", len(params_list))
 
 
 async def run(pool: asyncpg.Pool) -> None:
@@ -110,10 +111,16 @@ async def run(pool: asyncpg.Pool) -> None:
                 await asyncio.sleep(0)
                 continue
 
-            async with pool.acquire() as conn:
-                for _tp, records in batch.items():
-                    for record in records:
-                        await _handle_record(conn, record.value)
+            params_list: list[tuple] = []
+            for _tp, records in batch.items():
+                for record in records:
+                    p = _record_to_params(record.value)
+                    if p is not None:
+                        params_list.append(p)
+
+            if params_list:
+                async with pool.acquire() as conn:
+                    await _flush_batch(conn, params_list)
 
     except asyncio.CancelledError:
         log.info("sentiment consumer cancelled; shutting down")

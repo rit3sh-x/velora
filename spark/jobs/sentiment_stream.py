@@ -42,35 +42,47 @@ _TWEET_SCHEMA = StructType([
 ])
 
 
-def _vader_score(text: str | None) -> tuple[float, str] | None:
-    """VADER compound + label per-row. Lazy-init analyzer per executor."""
-    if text is None or text == "":
-        return None
-    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-    global _vader_analyzer
-    try:
-        _vader_analyzer
-    except NameError:
-        _vader_analyzer = SentimentIntensityAnalyzer()
-    s = _vader_analyzer.polarity_scores(text)
-    c = s["compound"]
-    if c >= 0.05:
-        label = "positive"
-    elif c <= -0.05:
-        label = "negative"
-    else:
-        label = "neutral"
-    return float(c), label
-
-
 _VADER_RESULT_SCHEMA = StructType([
     StructField("compound", DoubleType(), True),
     StructField("label",    StringType(), True),
 ])
 
 
+def _vader_label(c: float) -> str:
+    if c >= 0.05:
+        return "positive"
+    if c <= -0.05:
+        return "negative"
+    return "neutral"
+
+
 def _make_vader_udf():
-    return F.udf(_vader_score, _VADER_RESULT_SCHEMA)
+    """VADER pandas-UDF — batched, lazy-init analyzer per executor.
+
+    ~5x faster than row-UDF: avoids per-row Python crossing JVM-Python boundary.
+    """
+    @F.pandas_udf(_VADER_RESULT_SCHEMA)
+    def vader_udf(text_series: pd.Series) -> pd.DataFrame:
+        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+        global _vader_analyzer
+        try:
+            _vader_analyzer
+        except NameError:
+            _vader_analyzer = SentimentIntensityAnalyzer()
+
+        compounds: list[float | None] = []
+        labels: list[str | None] = []
+        for t in text_series.tolist():
+            if not isinstance(t, str) or not t:
+                compounds.append(None)
+                labels.append(None)
+                continue
+            c = float(_vader_analyzer.polarity_scores(t)["compound"])
+            compounds.append(c)
+            labels.append(_vader_label(c))
+        return pd.DataFrame({"compound": compounds, "label": labels})
+
+    return vader_udf
 
 
 _CLEAN_UDF = F.udf(clean_text, StringType())

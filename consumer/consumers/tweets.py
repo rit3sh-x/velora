@@ -9,7 +9,7 @@ from pathlib import Path
 from kafka import KafkaConsumer
 from kafka.errors import KafkaError
 from pydantic import ValidationError
-from pymongo import ReturnDocument
+from pymongo import UpdateOne
 from pymongo.errors import PyMongoError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -55,33 +55,31 @@ def _event_to_doc(event: TweetEvent) -> dict[str, object]:
     }
 
 
-async def _handle_record(raw_value: object) -> None:
-    """Parse one Kafka record value and upsert into Mongo bronze."""
+def _record_to_op(raw_value: object) -> UpdateOne | None:
+    """Parse one Kafka record into a Mongo UpdateOne op. None on parse error."""
     try:
         event = TweetEvent.model_validate(raw_value)
     except ValidationError as exc:
         log.warning("tweet parse error: %s | payload=%r", exc, raw_value)
-        return
+        return None
+    return UpdateOne(
+        {"tweet_id": event.tweet_id, "source": event.source},
+        {"$setOnInsert": _event_to_doc(event)},
+        upsert=True,
+    )
 
+
+async def _flush_batch(ops: list[UpdateOne]) -> None:
+    """Bulk-upsert a batch of UpdateOne ops. ordered=False for max parallelism."""
+    if not ops:
+        return
     coll = get_tweets_collection()
-    doc = _event_to_doc(event)
-
     try:
-        result = await coll.update_one(
-            {"tweet_id": event.tweet_id, "source": event.source},
-            {"$setOnInsert": doc},
-            upsert=True,
-        )
+        result = await coll.bulk_write(ops, ordered=False)
+        log.debug("mongo bulk: matched=%d upserted=%d (batch=%d)",
+                  result.matched_count, len(result.upserted_ids), len(ops))
     except PyMongoError as exc:
-        log.warning("mongo upsert error: %s | tweet_id=%s source=%s",
-                    exc, event.tweet_id, event.source)
-        return
-
-    if result.upserted_id is not None:
-        log.debug("inserted tweet_id=%s source=%s coin=%s ts=%s",
-                  event.tweet_id, event.source, event.coin, event.ts)
-    else:
-        log.debug("dup tweet_id=%s source=%s", event.tweet_id, event.source)
+        log.warning("mongo bulk_write error: %s (batch=%d)", exc, len(ops))
 
 
 async def run() -> None:
@@ -115,9 +113,13 @@ async def run() -> None:
                 await asyncio.sleep(0)
                 continue
 
+            ops: list[UpdateOne] = []
             for _tp, records in batch.items():
                 for record in records:
-                    await _handle_record(record.value)
+                    op = _record_to_op(record.value)
+                    if op is not None:
+                        ops.append(op)
+            await _flush_batch(ops)
 
     except asyncio.CancelledError:
         log.info("tweets consumer cancelled; shutting down")
