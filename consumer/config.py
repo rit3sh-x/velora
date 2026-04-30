@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     vader_interval_seconds: int = 30
     bert_interval_seconds: int = 300
     aggregator_interval_seconds: int = 60
+    live_sentiment_interval_seconds: int = 60
+    maintenance_interval_seconds: int = 21600
+    cagg_refresh_interval_seconds: int = 60
 
     bert_model: str = "distilbert-base-uncased-finetuned-sst-2-english"
     bert_batch_size: int = 64

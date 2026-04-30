@@ -14,11 +14,11 @@ class Settings(BaseSettings):
 
     kafka_broker: str = "localhost:9092"
 
-    nitter_url: str = "https://nitter.privacyredirect.com"
+    nitter_url: str = "https://nitter.tiekoetter.com"
     tweet_poll_interval_seconds: int = 120
-    tweets_per_scrape: int = 200
+    tweets_per_scrape: int = 100
     tweet_max_pages: int = 12
-    playwright_timeout_ms: int = 30000
+    playwright_timeout_ms: int = 45000
 
     tweet_backfill_enabled: bool = True
     tweet_backfill_days: int = 2

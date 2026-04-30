@@ -3,6 +3,9 @@
 Runs the Binance WS consumer and the Nitter tweet rotator concurrently
 under one asyncio event loop. Both publish to Kafka.
 
+Data seeding lives in the `seed/` package and is run separately:
+    uv run python -m seed
+
 Run with:
     cd producer && uv run python run.py
 """
@@ -19,7 +22,6 @@ import asyncio
 import logging
 
 from producer import binance_producer, tweet_producer
-from producer.bootstrap_tweets import backfill_tweets
 from producer.kafka_client import close_producer
 
 log = logging.getLogger("velora.producer.run")
@@ -32,20 +34,11 @@ def _setup_logging() -> None:
     )
 
 
-async def _tweets_pipeline() -> None:
-    """Run backfill first, then start the live rotator."""
-    try:
-        await backfill_tweets()
-    except Exception:
-        log.exception("tweet backfill failed; starting live loop anyway")
-    await tweet_producer.run()
-
-
 async def _main() -> None:
     log.info("starting velora producer")
     tasks = [
         asyncio.create_task(binance_producer.run(), name="binance"),
-        asyncio.create_task(_tweets_pipeline(), name="tweets"),
+        asyncio.create_task(tweet_producer.run(), name="tweets"),
     ]
     try:
         await asyncio.gather(*tasks)

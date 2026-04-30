@@ -89,20 +89,12 @@ def _resolve_coin(coin: str) -> str:
 
 
 def _add_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """Append ema12/ema26/sma20/sma50/rsi14/macd/macd_signal/macd_hist columns."""
+    """Append ema12/ema26/sma20/sma50 columns."""
     close = df["close"]
     df["ema12"] = close.ewm(span=12, adjust=False).mean()
     df["ema26"] = close.ewm(span=26, adjust=False).mean()
     df["sma20"] = close.rolling(20, min_periods=1).mean()
     df["sma50"] = close.rolling(50, min_periods=1).mean()
-    delta = close.diff()
-    gain = delta.clip(lower=0).ewm(alpha=1 / 14, adjust=False).mean()
-    loss = (-delta.clip(upper=0)).ewm(alpha=1 / 14, adjust=False).mean()
-    rs = gain / loss
-    df["rsi14"] = 100 - (100 / (1 + rs))
-    df["macd"] = df["ema12"] - df["ema26"]
-    df["macd_signal"] = df["macd"].ewm(span=9, adjust=False).mean()
-    df["macd_hist"] = df["macd"] - df["macd_signal"]
     return df
 
 
@@ -290,19 +282,20 @@ async def sentiment_hourly(
     rows = await pool.fetch(
         """
         SELECT
-            time_bucket('1 hour', ts) AS ts,
-            AVG(compound_vader)::DOUBLE PRECISION AS avg_compound,
-            AVG(compound_bert)::DOUBLE PRECISION  AS avg_compound_bert,
-            COUNT(*)::INT                         AS post_count,
-            (AVG(CASE WHEN compound_vader >  0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS positive_pct,
-            (AVG(CASE WHEN compound_vader < -0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS negative_pct,
-            (AVG(CASE WHEN compound_vader BETWEEN -0.05 AND 0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS neutral_pct
-        FROM sentiment_scored
+            bucket AS ts,
+            avg_compound_vader::DOUBLE PRECISION AS avg_compound,
+            avg_compound_bert::DOUBLE PRECISION  AS avg_compound_bert,
+            post_count::INT                      AS post_count,
+            ROUND(post_count * pos_ratio)::INT                       AS positive_count,
+            ROUND(post_count * neg_ratio)::INT                       AS negative_count,
+            ROUND(post_count * (1 - pos_ratio - neg_ratio))::INT     AS neutral_count,
+            (pos_ratio * 100)::DOUBLE PRECISION                      AS positive_pct,
+            (neg_ratio * 100)::DOUBLE PRECISION                      AS negative_pct,
+            ((1 - pos_ratio - neg_ratio) * 100)::DOUBLE PRECISION    AS neutral_pct
+        FROM sentiment_hourly
         WHERE coin = $1
-          AND ts >= NOW() - ($2::int * INTERVAL '1 day')
-          AND compound_vader IS NOT NULL
-        GROUP BY 1
-        ORDER BY 1 ASC
+          AND bucket >= NOW() - ($2::int * INTERVAL '1 day')
+        ORDER BY bucket ASC
         """,
         coin,
         days,
@@ -313,6 +306,9 @@ async def sentiment_hourly(
             "avg_compound": _clean(r["avg_compound"]) or 0.0,
             "avg_compound_bert": _clean(r["avg_compound_bert"]) or 0.0,
             "post_count": int(r["post_count"] or 0),
+            "positive_count": int(r["positive_count"] or 0),
+            "negative_count": int(r["negative_count"] or 0),
+            "neutral_count": int(r["neutral_count"] or 0),
             "positive_pct": _clean(r["positive_pct"]) or 0.0,
             "negative_pct": _clean(r["negative_pct"]) or 0.0,
             "neutral_pct": _clean(r["neutral_pct"]) or 0.0,
@@ -334,32 +330,29 @@ async def price_sentiment(
     sent_rows = await pool.fetch(
         """
         SELECT
-            time_bucket('1 hour', ts) AS ts,
-            AVG(compound_vader)::DOUBLE PRECISION AS avg_compound,
-            AVG(compound_bert)::DOUBLE PRECISION  AS avg_compound_bert,
-            COUNT(*)::INT                         AS post_count,
-            (AVG(CASE WHEN compound_vader >  0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS positive_pct,
-            (AVG(CASE WHEN compound_vader < -0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS negative_pct,
-            (AVG(CASE WHEN compound_vader BETWEEN -0.05 AND 0.05 THEN 1.0 ELSE 0.0 END) * 100)::DOUBLE PRECISION AS neutral_pct
-        FROM sentiment_scored
+            bucket AS ts,
+            avg_compound_vader::DOUBLE PRECISION AS avg_compound,
+            avg_compound_bert::DOUBLE PRECISION  AS avg_compound_bert,
+            post_count::INT                      AS post_count,
+            (pos_ratio * 100)::DOUBLE PRECISION  AS positive_pct,
+            (neg_ratio * 100)::DOUBLE PRECISION  AS negative_pct,
+            ((1 - pos_ratio - neg_ratio) * 100)::DOUBLE PRECISION AS neutral_pct
+        FROM sentiment_hourly
         WHERE coin = $1
-          AND ts >= NOW() - ($2::int * INTERVAL '1 day')
-          AND compound_vader IS NOT NULL
-        GROUP BY 1
-        ORDER BY 1 ASC
+          AND bucket >= NOW() - ($2::int * INTERVAL '1 day')
+        ORDER BY bucket ASC
         """,
         coin,
         days,
     )
     price_rows = await pool.fetch(
         """
-        SELECT time_bucket('1 hour', ts) AS ts,
-               last(close, ts)::DOUBLE PRECISION AS price
-        FROM prices_1m
+        SELECT bucket AS ts,
+               close::DOUBLE PRECISION AS price
+        FROM prices_hourly
         WHERE coin = $1
-          AND ts >= NOW() - ($2::int * INTERVAL '1 day')
-        GROUP BY 1
-        ORDER BY 1 ASC
+          AND bucket >= NOW() - ($2::int * INTERVAL '1 day')
+        ORDER BY bucket ASC
         """,
         coin,
         days,
@@ -385,10 +378,21 @@ async def price_sentiment(
             [dict(r) for r in price_rows], columns=["ts", "price"]
         )
 
-        if sent_df.empty:
+        if sent_df.empty and price_df.empty:
             return []
-        merged = sent_df.merge(price_df, on="ts", how="left").sort_values("ts")
-        merged = merged.reset_index(drop=True)
+
+        if sent_df.empty:
+            merged = price_df.copy()
+            for col in ("avg_compound", "avg_compound_bert", "post_count",
+                        "positive_pct", "negative_pct", "neutral_pct"):
+                merged[col] = None
+        elif price_df.empty:
+            merged = sent_df.copy()
+            merged["price"] = None
+        else:
+            merged = sent_df.merge(price_df, on="ts", how="outer")
+
+        merged = merged.sort_values("ts").reset_index(drop=True)
 
         merged["return_1h"] = merged["price"].pct_change()
         merged["sentiment_lag1"] = merged["avg_compound"].shift(1)
@@ -399,6 +403,85 @@ async def price_sentiment(
         return _df_to_records(merged)
 
     return await asyncio.to_thread(_build)
+
+
+@router.get("/coin/{coin}/sentiment-live")
+async def sentiment_live(
+    coin: str,
+    hours: int = Query(24, ge=1, le=168),
+    pool: asyncpg.Pool = Depends(db),
+) -> list[dict[str, Any]]:
+    """1-minute-bucket VADER + BERT sentiment for the last N hours.
+
+    Use for live overlays on price charts. Range capped to 7 days (168h)."""
+    coin = _resolve_coin(coin)
+
+    rows = await pool.fetch(
+        """
+        SELECT
+            time_bucket('1 minute', ts) AS ts,
+            AVG(compound_vader)::DOUBLE PRECISION AS avg_compound,
+            AVG(compound_bert)::DOUBLE PRECISION  AS avg_compound_bert,
+            COUNT(*)::INT                         AS post_count
+        FROM sentiment_scored
+        WHERE coin = $1
+          AND ts >= NOW() - ($2::int * INTERVAL '1 hour')
+          AND compound_vader IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1 ASC
+        """,
+        coin,
+        hours,
+    )
+    return [
+        {
+            "ts": _iso_z(r["ts"]),
+            "avg_compound": _clean(r["avg_compound"]),
+            "avg_compound_bert": _clean(r["avg_compound_bert"]),
+            "post_count": int(r["post_count"] or 0),
+        }
+        for r in rows
+    ]
+
+
+@router.get("/coin/{coin}/sentiment-live-window")
+async def sentiment_live_window(
+    coin: str,
+    hours: int = Query(24, ge=1, le=168),
+    pool: asyncpg.Pool = Depends(db),
+) -> list[dict[str, Any]]:
+    """Precomputed 1-minute-bucket sentiment for the last N hours.
+
+    Reads from `coin_live_sentiment`, which is upserted every 60s by a worker.
+    Range capped to 7 days (168h)."""
+    coin = _resolve_coin(coin)
+
+    rows = await pool.fetch(
+        """
+        SELECT
+            bucket_ts,
+            avg_vader,
+            avg_bert,
+            n_tweets,
+            oldest_age_sec
+        FROM coin_live_sentiment
+        WHERE coin = $1
+          AND bucket_ts >= NOW() - ($2::int * INTERVAL '1 hour')
+        ORDER BY bucket_ts ASC
+        """,
+        coin,
+        hours,
+    )
+    return [
+        {
+            "ts": _iso_z(r["bucket_ts"]),
+            "avg_vader": _clean(r["avg_vader"]),
+            "avg_bert": _clean(r["avg_bert"]),
+            "n_tweets": int(r["n_tweets"] or 0),
+            "oldest_age_sec": _clean(r["oldest_age_sec"]),
+        }
+        for r in rows
+    ]
 
 
 @router.get("/coin/{coin}/correlation")
@@ -412,7 +495,7 @@ async def correlation(
     summary = await pool.fetchrow(
         """
         SELECT lag1_corr, lag2_corr, lag1_corr_bert, lag2_corr_bert,
-               matched_hours, lag1_points, lag2_points
+               lag1_points, lag2_points
         FROM aggregates_summary
         WHERE coin = $1
         """,
@@ -477,7 +560,6 @@ async def correlation(
 
     return {
         "coin": coin,
-        "matched_hours": int(summary["matched_hours"]) if summary else 0,
         "lag1_points": int(summary["lag1_points"]) if summary else 0,
         "lag2_points": int(summary["lag2_points"]) if summary else 0,
         "lag1_corr": _clean(summary["lag1_corr"]) if summary else None,
@@ -495,14 +577,28 @@ async def correlation(
 async def tweets(
     coin: str,
     sentiment: str = Query("all", pattern="^(positive|negative|all)$"),
-    limit: int = Query(5, ge=1, le=50),
+    limit: int = Query(5, ge=1, le=200),
+    since_ms: int | None = Query(None, description="Epoch ms lower bound (Grafana ${__from})"),
+    until_ms: int | None = Query(None, description="Epoch ms upper bound (Grafana ${__to})"),
     pool: asyncpg.Pool = Depends(db),
 ) -> list[dict[str, Any]]:
-    """Top tweets, sorted by score in chosen direction."""
+    """Top tweets, sorted by score in chosen direction.
+    Optional since_ms/until_ms restrict to a dashboard time window."""
     coin = _resolve_coin(coin)
 
+    params: list[Any] = [coin]
+    where_extra = ""
+    if since_ms is not None:
+        params.append(datetime.fromtimestamp(since_ms / 1000.0, tz=timezone.utc))
+        where_extra += f" AND t.ts >= ${len(params)}"
+    if until_ms is not None:
+        params.append(datetime.fromtimestamp(until_ms / 1000.0, tz=timezone.utc))
+        where_extra += f" AND t.ts <= ${len(params)}"
+    params.append(limit)
+    limit_idx = len(params)
+
     if sentiment == "positive":
-        sql = """
+        sql = f"""
             SELECT t.ts, t.text, t.username, t.url, s.compound_vader AS compound
             FROM raw_tweets t
             JOIN sentiment_scored s
@@ -510,11 +606,12 @@ async def tweets(
             WHERE t.coin = $1
               AND s.compound_vader IS NOT NULL
               AND s.compound_vader > 0
+              {where_extra}
             ORDER BY s.compound_vader DESC
-            LIMIT $2
+            LIMIT ${limit_idx}
         """
     elif sentiment == "negative":
-        sql = """
+        sql = f"""
             SELECT t.ts, t.text, t.username, t.url, s.compound_vader AS compound
             FROM raw_tweets t
             JOIN sentiment_scored s
@@ -522,21 +619,23 @@ async def tweets(
             WHERE t.coin = $1
               AND s.compound_vader IS NOT NULL
               AND s.compound_vader < 0
+              {where_extra}
             ORDER BY s.compound_vader ASC
-            LIMIT $2
+            LIMIT ${limit_idx}
         """
     else:
-        sql = """
+        sql = f"""
             SELECT t.ts, t.text, t.username, t.url, s.compound_vader AS compound
             FROM raw_tweets t
             LEFT JOIN sentiment_scored s
               ON s.tweet_id = t.tweet_id AND s.ts = t.ts
             WHERE t.coin = $1
+              {where_extra}
             ORDER BY t.ts DESC
-            LIMIT $2
+            LIMIT ${limit_idx}
         """
 
-    rows = await pool.fetch(sql, coin, limit)
+    rows = await pool.fetch(sql, *params)
     return [
         {
             "ts": _iso_z(r["ts"]),

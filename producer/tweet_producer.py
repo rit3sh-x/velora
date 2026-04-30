@@ -30,7 +30,7 @@ _DATE_FORMATS: tuple[str, ...] = (
 
 def _parse_tweet_date(raw: str | None) -> datetime:
     if not raw:
-        return datetime.now(timezone.utc)
+        raise ValueError("missing tweet date")
     cleaned = raw.strip()
     for fmt in _DATE_FORMATS:
         try:
@@ -38,8 +38,7 @@ def _parse_tweet_date(raw: str | None) -> datetime:
             return dt.replace(tzinfo=timezone.utc)
         except ValueError:
             continue
-    log.debug("could not parse tweet date %r; using now()", raw)
-    return datetime.now(timezone.utc)
+    raise ValueError(f"unparseable tweet date: {raw!r}")
 
 
 def _to_event(coin: str, raw: dict[str, Any], scraped_at: datetime) -> TweetEvent:
@@ -82,28 +81,32 @@ async def _scrape_and_publish(coin: str) -> int:
 
 
 async def run() -> None:
-    """Long-running rotator: one coin per interval, indefinitely."""
+    """Long-running loop: concurrent scrape of all coins each cycle, indefinitely."""
     interval = settings.tweet_poll_interval_seconds
-    idx = 0
     log.info(
-        "tweet producer running: %d coins, interval=%ss, limit=%d",
+        "tweet producer running: %d coins concurrent, interval=%ss, limit=%d",
         len(COIN_NAMES),
         interval,
         settings.tweets_per_scrape,
     )
 
     while True:
-        coin = COIN_NAMES[idx % len(COIN_NAMES)]
-        idx += 1
-
         try:
-            published = await _scrape_and_publish(coin)
-            log.info("[%s] published %d tweets", coin, published)
+            results = await asyncio.gather(
+                *[_scrape_and_publish(c) for c in COIN_NAMES],
+                return_exceptions=True,
+            )
         except asyncio.CancelledError:
             log.info("tweet producer cancelled")
             raise
-        except Exception as exc:
-            log.warning("[%s] scrape cycle failed: %s", coin, exc)
+
+        for coin, result in zip(COIN_NAMES, results):
+            if isinstance(result, asyncio.CancelledError):
+                raise result
+            if isinstance(result, BaseException):
+                log.warning("[%s] scrape cycle failed: %s", coin, result)
+            else:
+                log.info("[%s] published %d tweets", coin, result)
 
         try:
             await asyncio.sleep(interval)

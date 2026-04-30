@@ -10,6 +10,9 @@ Crypto sentiment dashboard. Live Binance price feed + Nitter tweet scrape, dual-
 ## Architecture
 
 ```
+                                  consumer infra (docker)
+                                  TimescaleDB ← schema applied @ container init
+                                       ↑
 producer (machine A)              consumer (machine B)
 ─────────────────────             ────────────────────
 binance_producer ──┐               ┌─→ consumers/prices ─┐
@@ -17,9 +20,11 @@ tweet_producer  ──┴─→ Kafka :9092 ─┤                     ├─→
                                    └─→ consumers/tweets ─┘                       ↑
                                                                                  │
                                                                           vader + bert workers
+seed/ (optional, one-shot) ── prices REST → DB direct
+                            └─ tweets Nitter → Kafka → consumer dedupes
 ```
 
-Two-machine pipeline, Kafka-bridged. Producer is stateless (no DB). Consumer owns all storage + analytics + serving. Single-machine dev = everything on localhost.
+Two-machine pipeline, Kafka-bridged. Producer stateless (no DB). Consumer owns storage + analytics + serving. Schema lives in `seed/schema.sql` and is applied automatically by Postgres init scripts on first volume init (V1, V2). Single-machine dev = everything on localhost.
 
 ---
 
@@ -27,11 +32,15 @@ Two-machine pipeline, Kafka-bridged. Producer is stateless (no DB). Consumer own
 
 | Step | Component | Cadence |
 |------|-----------|---------|
+| Apply schema | `seed/schema.sql` mounted into Timescale `/docker-entrypoint-initdb.d/` | once @ first container init |
+| Optional historical backfill | `seed/` (Binance REST → DB; Nitter → Kafka) | one-shot, idempotent, skip-if-fresh |
 | Pull live OHLCV from Binance | `producer/binance_producer.py` (kline_1m WS) | per closed bar (~60s) |
-| Scrape tweets from Nitter | `producer/tweet_producer.py` (Playwright) | rotate 1 coin per 120s |
-| Persist to TimescaleDB | `consumer/consumers/{prices,tweets}.py` | live |
+| Scrape tweets from Nitter | `producer/tweet_producer.py` (Playwright) | concurrent all coins per 120s |
+| Persist to TimescaleDB | `consumer/consumers/{prices,tweets}.py` | live (tweets dedupe `ON CONFLICT DO NOTHING`) |
 | Score sentiment | `consumer/workers/vader.py` (live) + `bert.py` (batch) | 30s / 5min |
 | Compute lag corr + summary | `consumer/workers/aggregator.py` | 60s |
+| Live sentiment rolling buckets | `consumer/workers/live_sentiment.py` | 60s |
+| DB maintenance | `consumer/workers/maintenance.py` | 6h |
 | Serve via REST | `consumer/api/` (FastAPI, 13 endpoints) | per request |
 | Visualize | Grafana 11 + Infinity datasource | 10–30s refresh |
 
@@ -52,7 +61,9 @@ Two-machine pipeline, Kafka-bridged. Producer is stateless (no DB). Consumer own
 
 **Public Nitter (`tiekoetter.com`), not self-hosted** — saves a docker service + Redis. Single instance, no fallback. On failure, scraper logs and skips the cycle. Sentiment degrades gracefully.
 
-**No preseed** — app starts cold. First minute = empty. Designed to backfill via Binance REST during initial boot is a future option (currently kline_1m WS only feeds going forward).
+**Optional seed step** (`seed/`) — one-shot historical backfill: ~24h of 1m klines from Binance REST (direct DB insert) + ~N days of tweets via Nitter date-bounded search (publish to Kafka, consumer dedupes via PK). Idempotent + skip-if-fresh per coin. Run once after boot to skip the cold-start fill window; skip entirely for a true cold-start demo.
+
+**Schema applied automatically** — `seed/schema.sql` mounted into Timescale `/docker-entrypoint-initdb.d/`. Runs on first container init only. Subsequent restarts keep existing data. Schema changes require `down -v` (wipe + re-init) in dev.
 
 ---
 
@@ -76,14 +87,17 @@ Retention enforced by Timescale automatically (`add_retention_policy`). Continuo
 ```
 velora/
 ├── docker-compose.producer.yml     zookeeper + kafka
-├── docker-compose.consumer.yml     timescaledb + grafana
+├── docker-compose.consumer.yml     timescaledb (schema auto-applied) + grafana
 ├── .env / .env.example              shared per-machine config
 ├── producer/                        Binance WS + Nitter scraper → Kafka
 ├── consumer/                        Kafka → TimescaleDB + sentiment + FastAPI
+├── seed/                            schema + optional historical backfill
+│   └── schema.sql                  mounted into Timescale init dir
 ├── shared/                          coins registry, kafka topics, pydantic schemas
 ├── monitoring/grafana/              dashboards + datasource provisioning
 ├── docs/api.md                      API response contract (source of truth)
 ├── SETUP.md                         install + boot + ops + troubleshoot
+├── SPEC.md                          machine-readable spec (cavekit format)
 ├── logic/                           reference (old Spark sentiment pipeline)
 └── test/                            reference (Node prototypes for binance ws + nitter)
 ```
@@ -105,7 +119,11 @@ CoinSpec("cardano", "ADA", "Cardano", "ADAUSDT", "cardano"),
 | Var | Default | Effect |
 |-----|---------|--------|
 | `TWEET_POLL_INTERVAL_SECONDS` | 120 | Rotation cadence (one coin per tick) |
-| `TWEETS_PER_SCRAPE` | 30 | Tweets fetched per coin per cycle |
+| `TWEETS_PER_SCRAPE` | 100 | Tweets fetched per coin per cycle |
+| `TWEET_MAX_PAGES` | 12 | Nitter "Load more" pagination cap |
+| `PLAYWRIGHT_TIMEOUT_MS` | 45000 | Per-page nav timeout |
+| `TWEET_BACKFILL_DAYS` | 2 | Seed: days of historical scrape per coin |
+| `TWEET_BACKFILL_MAX_PER_DAY` | 600 | Seed: tweet cap per coin per day |
 | `VADER_INTERVAL_SECONDS` | 30 | VADER scoring loop |
 | `BERT_INTERVAL_SECONDS` | 300 | DistilBERT enrichment loop |
 | `BERT_ENABLED` | true | Set false to skip BERT entirely |

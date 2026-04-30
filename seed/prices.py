@@ -1,8 +1,8 @@
 """One-shot historical backfill of prices_1m from Binance REST.
 
-Runs once at consumer startup before the live Kafka stream begins. Pulls
-~24h of 1m klines per coin and bulk-inserts with ON CONFLICT DO NOTHING.
-Idempotent — safe to re-run.
+Run via the `seed` package entrypoint AFTER the consumer DB is up.
+Pulls ~24h of 1m klines per coin and bulk-inserts with ON CONFLICT DO NOTHING.
+Idempotent — safe to re-run; cheap when data is fresh.
 """
 from __future__ import annotations
 
@@ -18,11 +18,13 @@ from typing import Any
 
 import asyncpg
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from shared.coins import COINS
 
-log = logging.getLogger("velora.bootstrap.prices")
+log = logging.getLogger("velora.seed.prices")
 
 _BINANCE_KLINES = "https://api.binance.com/api/v3/klines"
 _INTERVAL = "1m"
@@ -37,11 +39,23 @@ ON CONFLICT (coin, ts) DO NOTHING
 """
 
 
+async def needs_backfill(pool: asyncpg.Pool, coin: str, min_hours_history: int = 23) -> bool:
+    """True if we should backfill — i.e. less than `min_hours_history` of data exists."""
+    row = await pool.fetchrow(
+        "SELECT MIN(ts) AS oldest, COUNT(*) AS n FROM prices_1m WHERE coin = $1",
+        coin,
+    )
+    if not row or (row["n"] or 0) == 0:
+        return True
+    age_hours = (datetime.now(timezone.utc) - row["oldest"]).total_seconds() / 3600
+    return age_hours < min_hours_history
+
+
 def _fetch_klines(symbol: str, end_time_ms: int | None = None) -> list[list[Any]]:
     url = f"{_BINANCE_KLINES}?symbol={symbol}&interval={_INTERVAL}&limit={_LIMIT}"
     if end_time_ms is not None:
         url += f"&endTime={end_time_ms}"
-    req = urllib.request.Request(url, headers={"User-Agent": "velora-bootstrap/1.0"})
+    req = urllib.request.Request(url, headers={"User-Agent": "velora-seed/1.0"})
     with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
@@ -106,10 +120,19 @@ async def _backfill_coin(pool: asyncpg.Pool, coin: str, symbol: str) -> int:
 
 
 async def backfill_prices(pool: asyncpg.Pool) -> None:
-    """Backfill ~16h of 1m klines for every configured coin. Idempotent."""
+    """Backfill ~24h of 1m klines for every configured coin (skip-if-fresh)."""
     log.info("price backfill starting (%d coins)", len(COINS))
     total = 0
     for spec in COINS:
+        if not await needs_backfill(pool, spec.coin):
+            row = await pool.fetchrow(
+                "SELECT MIN(ts) AS oldest, COUNT(*) AS n FROM prices_1m WHERE coin = $1",
+                spec.coin,
+            )
+            n = row["n"] if row else 0
+            oldest = row["oldest"] if row else None
+            log.info("[%s] skipping backfill: have %d rows since %s", spec.coin, n, oldest)
+            continue
         n = await _backfill_coin(pool, spec.coin, spec.binance_pair)
         total += n
     log.info("price backfill complete: %d total bars inserted", total)

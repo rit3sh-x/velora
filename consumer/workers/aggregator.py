@@ -61,20 +61,14 @@ _LAG_BUCKET = "1 hour"
 
 _LAG_SQL = """
 WITH price_buckets AS (
-    SELECT time_bucket('1 hour', ts) AS bucket,
-           last(close, ts) AS price
-    FROM prices_1m
-    WHERE coin = $1 AND ts > NOW() - INTERVAL '7 days'
-    GROUP BY bucket
+    SELECT bucket, close AS price
+    FROM prices_hourly
+    WHERE coin = $1 AND bucket > NOW() - INTERVAL '7 days'
 ),
 sent_buckets AS (
-    SELECT time_bucket('1 hour', ts) AS bucket,
-           AVG(compound_vader)::DOUBLE PRECISION AS avg_compound_vader,
-           AVG(compound_bert)::DOUBLE PRECISION  AS avg_compound_bert,
-           COUNT(*)::INT AS post_count
-    FROM sentiment_scored
-    WHERE coin = $1 AND ts > NOW() - INTERVAL '7 days'
-    GROUP BY bucket
+    SELECT bucket, avg_compound_vader, avg_compound_bert, post_count
+    FROM sentiment_hourly
+    WHERE coin = $1 AND bucket > NOW() - INTERVAL '7 days'
 )
 SELECT COALESCE(s.bucket, p.bucket) AS hour,
        s.avg_compound_vader,
@@ -92,14 +86,14 @@ INSERT INTO aggregates_summary (
     positive_pct_24h, negative_pct_24h,
     last_price, change_24h_pct, change_1h_pct, volume_24h, volume_1h,
     lag1_corr, lag2_corr, lag1_corr_bert, lag2_corr_bert,
-    matched_hours, lag1_points, lag2_points,
+    lag1_points, lag2_points,
     computed_at
 ) VALUES (
     $1, $2, $3, $4,
     $5, $6,
     $7, $8, $9, $10, $11,
     $12, $13, $14, $15,
-    $16, $17, $18,
+    $16, $17,
     NOW()
 )
 ON CONFLICT (coin) DO UPDATE SET
@@ -117,7 +111,6 @@ ON CONFLICT (coin) DO UPDATE SET
     lag2_corr              = EXCLUDED.lag2_corr,
     lag1_corr_bert         = EXCLUDED.lag1_corr_bert,
     lag2_corr_bert         = EXCLUDED.lag2_corr_bert,
-    matched_hours          = EXCLUDED.matched_hours,
     lag1_points            = EXCLUDED.lag1_points,
     lag2_points            = EXCLUDED.lag2_points,
     computed_at            = NOW()
@@ -149,7 +142,6 @@ def _compute_lag(rows: list[asyncpg.Record]) -> dict[str, object | None]:
             "lag2_corr": None,
             "lag1_corr_bert": None,
             "lag2_corr_bert": None,
-            "matched_hours": 0,
             "lag1_points": 0,
             "lag2_points": 0,
         }
@@ -175,7 +167,6 @@ def _compute_lag(rows: list[asyncpg.Record]) -> dict[str, object | None]:
     df["bert_lag1"] = df["bert_ff"].shift(1)
     df["bert_lag2"] = df["bert_ff"].shift(2)
 
-    matched_hours = int(df.dropna(subset=["avg_compound_vader", "price"]).shape[0])
     lag1_points = int(df.dropna(subset=["sent_lag1", "return_1h"]).shape[0])
     lag2_points = int(df.dropna(subset=["sent_lag2", "return_1h"]).shape[0])
     bert_lag1_points = int(df.dropna(subset=["bert_lag1", "return_1h"]).shape[0])
@@ -191,7 +182,6 @@ def _compute_lag(rows: list[asyncpg.Record]) -> dict[str, object | None]:
         "lag2_corr": lag2_corr,
         "lag1_corr_bert": lag1_corr_bert,
         "lag2_corr_bert": lag2_corr_bert,
-        "matched_hours": matched_hours,
         "lag1_points": lag1_points,
         "lag2_points": lag2_points,
     }
@@ -238,7 +228,6 @@ async def _update_coin(conn: asyncpg.Connection, coin: str) -> None:
         lag["lag2_corr"],
         lag["lag1_corr_bert"],
         lag["lag2_corr_bert"],
-        lag["matched_hours"],
         lag["lag1_points"],
         lag["lag2_points"],
     )

@@ -1,29 +1,51 @@
 {
   "uid": "velora-coin",
-  "title": "Velora — Coin Detail",
-  "description": "Per-coin price action, technical indicators, sentiment, lag-correlation, and tweet samples.",
-  "tags": ["velora", "crypto"],
+  "title": "Velora \u00e2\u20ac\u201d Coin Detail",
+  "description": "Per-coin OHLCV, sentiment, lag-correlation and tweets, time-synced via shared crosshair. Tweets follow the dashboard time picker.",
+  "tags": [
+    "velora",
+    "crypto"
+  ],
   "schemaVersion": 39,
-  "version": 3,
+  "version": 5,
   "editable": true,
-  "graphTooltip": 1,
+  "graphTooltip": 2,
   "fiscalYearStartMonth": 0,
   "liveNow": true,
   "refresh": "10s",
-  "time": { "from": "now-24h", "to": "now" },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {
-    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m"],
-    "time_options": ["1h", "6h", "24h", "7d"]
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ],
+    "time_options": [
+      "1h",
+      "6h",
+      "24h",
+      "7d"
+    ]
   },
   "timezone": "browser",
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "templating": {
     "list": [
       {
         "name": "coin",
         "label": "Coin",
         "type": "query",
-        "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+        "datasource": {
+          "type": "yesoreyeram-infinity-datasource",
+          "uid": "velora"
+        },
         "definition": "GET /coins",
         "query": {
           "queryType": "infinity",
@@ -32,12 +54,20 @@
             "source": "url",
             "format": "table",
             "url": "/coins",
-            "url_options": { "method": "GET", "data": "" },
+            "url_options": {
+              "method": "GET",
+              "data": ""
+            },
             "root_selector": "",
             "columns": [
-              { "selector": "coin", "text": "coin", "type": "string" }
+              {
+                "selector": "coin",
+                "text": "coin",
+                "type": "string"
+              }
             ],
-            "filters": []
+            "filters": [],
+            "parser": "backend"
           }
         },
         "current": {},
@@ -55,36 +85,70 @@
     {
       "id": 100,
       "type": "row",
-      "title": "Live Ticker",
+      "title": "Live Snapshot",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
       "panels": []
     },
     {
       "id": 1,
       "type": "stat",
       "title": "Last Price",
-      "gridPos": { "x": 0, "y": 1, "w": 6, "h": 5 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/candles?hours=6",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "ts", "text": "time", "type": "timestamp" },
-            { "selector": "close", "text": "Price", "type": "number" }
+            {
+              "selector": "ts",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "close",
+              "text": "Price",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "value",
@@ -95,7 +159,10 @@
         "defaults": {
           "unit": "currencyUSD",
           "decimals": 4,
-          "color": { "mode": "fixed", "fixedColor": "#5794F2" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          }
         },
         "overrides": []
       }
@@ -104,26 +171,51 @@
       "id": 2,
       "type": "stat",
       "title": "24h Change",
-      "gridPos": { "x": 6, "y": 1, "w": 6, "h": 5 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/ticker/${coin}",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "change_24h_pct", "text": "Δ 24h", "type": "number" }
+            {
+              "selector": "change_24h_pct",
+              "text": "\u00ce\u201d 24h",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "background",
@@ -137,11 +229,26 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": -1 },
-              { "color": "yellow", "value": -0.1 },
-              { "color": "green", "value": 0.1 },
-              { "color": "dark-green", "value": 1 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -1
+              },
+              {
+                "color": "yellow",
+                "value": -0.1
+              },
+              {
+                "color": "green",
+                "value": 0.1
+              },
+              {
+                "color": "dark-green",
+                "value": 1
+              }
             ]
           }
         },
@@ -151,27 +258,52 @@
     {
       "id": 3,
       "type": "stat",
-      "title": "Total Posts (24h)",
-      "gridPos": { "x": 12, "y": 1, "w": 6, "h": 5 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "title": "Posts 24h",
+      "gridPos": {
+        "x": 10,
+        "y": 1,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/metrics",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "total_posts", "text": "Posts", "type": "number" }
+            {
+              "selector": "total_posts",
+              "text": "Posts",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "value",
@@ -182,7 +314,10 @@
         "defaults": {
           "unit": "short",
           "decimals": 0,
-          "color": { "mode": "fixed", "fixedColor": "#B877D9" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#B877D9"
+          }
         },
         "overrides": []
       }
@@ -190,27 +325,52 @@
     {
       "id": 4,
       "type": "gauge",
-      "title": "Avg Sentiment (VADER)",
-      "gridPos": { "x": 18, "y": 1, "w": 3, "h": 5 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "title": "VADER",
+      "gridPos": {
+        "x": 14,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/metrics",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "avg_sentiment", "text": "VADER", "type": "number" }
+            {
+              "selector": "avg_sentiment",
+              "text": "VADER",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "showThresholdLabels": false,
         "showThresholdMarkers": true
@@ -224,11 +384,26 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": -0.2 },
-              { "color": "yellow", "value": -0.05 },
-              { "color": "light-green", "value": 0.05 },
-              { "color": "green", "value": 0.2 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -0.2
+              },
+              {
+                "color": "yellow",
+                "value": -0.05
+              },
+              {
+                "color": "light-green",
+                "value": 0.05
+              },
+              {
+                "color": "green",
+                "value": 0.2
+              }
             ]
           }
         },
@@ -238,28 +413,53 @@
     {
       "id": 41,
       "type": "gauge",
-      "title": "Avg Sentiment (BERT)",
+      "title": "BERT",
       "description": "DistilBERT compound. Better for short crypto slang vs VADER.",
-      "gridPos": { "x": 21, "y": 1, "w": 3, "h": 5 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 19,
+        "y": 1,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/metrics",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "avg_sentiment_bert", "text": "BERT", "type": "number" }
+            {
+              "selector": "avg_sentiment_bert",
+              "text": "BERT",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "showThresholdLabels": false,
         "showThresholdMarkers": true
@@ -273,11 +473,26 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": -0.2 },
-              { "color": "yellow", "value": -0.05 },
-              { "color": "light-green", "value": 0.05 },
-              { "color": "green", "value": 0.2 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -0.2
+              },
+              {
+                "color": "yellow",
+                "value": -0.05
+              },
+              {
+                "color": "light-green",
+                "value": 0.05
+              },
+              {
+                "color": "green",
+                "value": 0.2
+              }
             ]
           }
         },
@@ -287,35 +502,65 @@
     {
       "id": 101,
       "type": "row",
-      "title": "Sentiment Breakdown & Lag Correlation",
+      "title": "Lag Correlation (sentiment ahead of price return)",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 6, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
       "panels": []
     },
     {
       "id": 5,
       "type": "stat",
       "title": "Positive %",
-      "gridPos": { "x": 0, "y": 7, "w": 4, "h": 4 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/metrics",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "positive_pct", "text": "Positive", "type": "number" }
+            {
+              "selector": "positive_pct",
+              "text": "Positive",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "background",
@@ -326,7 +571,10 @@
         "defaults": {
           "unit": "percent",
           "decimals": 1,
-          "color": { "mode": "fixed", "fixedColor": "green" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "green"
+          }
         },
         "overrides": []
       }
@@ -335,26 +583,51 @@
       "id": 6,
       "type": "stat",
       "title": "Negative %",
-      "gridPos": { "x": 4, "y": 7, "w": 4, "h": 4 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 4,
+        "y": 6,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/metrics",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "negative_pct", "text": "Negative", "type": "number" }
+            {
+              "selector": "negative_pct",
+              "text": "Negative",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "background",
@@ -365,7 +638,10 @@
         "defaults": {
           "unit": "percent",
           "decimals": 1,
-          "color": { "mode": "fixed", "fixedColor": "red" }
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "red"
+          }
         },
         "overrides": []
       }
@@ -373,28 +649,53 @@
     {
       "id": 7,
       "type": "stat",
-      "title": "VADER Lag-1",
-      "description": "Pearson corr between VADER sentiment shifted 1 bucket and bucket return. Needs ≥ 3 samples.",
-      "gridPos": { "x": 8, "y": 7, "w": 3, "h": 4 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "title": "VADER L1",
+      "description": "Pearson corr between VADER sentiment shifted 1 bucket and bucket return. Needs \u00e2\u2030\u00a5 3 samples.",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/correlation",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "lag1_corr", "text": "Lag-1", "type": "number" }
+            {
+              "selector": "lag1_corr",
+              "text": "VADER L1",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "value",
@@ -407,16 +708,34 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "—",
+          "noValue": "\u00e2\u20ac\u201d",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": -0.5 },
-              { "color": "yellow", "value": -0.2 },
-              { "color": "blue", "value": 0 },
-              { "color": "light-green", "value": 0.2 },
-              { "color": "green", "value": 0.5 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -0.5
+              },
+              {
+                "color": "yellow",
+                "value": -0.2
+              },
+              {
+                "color": "blue",
+                "value": 0
+              },
+              {
+                "color": "light-green",
+                "value": 0.2
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
             ]
           }
         },
@@ -426,28 +745,53 @@
     {
       "id": 8,
       "type": "stat",
-      "title": "VADER Lag-2",
+      "title": "VADER L2",
       "description": "Pearson corr between VADER sentiment shifted 2 buckets and bucket return.",
-      "gridPos": { "x": 11, "y": 7, "w": 3, "h": 4 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 11,
+        "y": 6,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/correlation",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "lag2_corr", "text": "Lag-2", "type": "number" }
+            {
+              "selector": "lag2_corr",
+              "text": "VADER L2",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "value",
@@ -460,16 +804,34 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "—",
+          "noValue": "\u00e2\u20ac\u201d",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": -0.5 },
-              { "color": "yellow", "value": -0.2 },
-              { "color": "blue", "value": 0 },
-              { "color": "light-green", "value": 0.2 },
-              { "color": "green", "value": 0.5 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -0.5
+              },
+              {
+                "color": "yellow",
+                "value": -0.2
+              },
+              {
+                "color": "blue",
+                "value": 0
+              },
+              {
+                "color": "light-green",
+                "value": 0.2
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
             ]
           }
         },
@@ -479,28 +841,53 @@
     {
       "id": 71,
       "type": "stat",
-      "title": "BERT Lag-1",
+      "title": "BERT L1",
       "description": "Pearson corr between BERT sentiment shifted 1 bucket and bucket return.",
-      "gridPos": { "x": 14, "y": 7, "w": 3, "h": 4 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 14,
+        "y": 6,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/correlation",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "lag1_corr_bert", "text": "BERT L1", "type": "number" }
+            {
+              "selector": "lag1_corr_bert",
+              "text": "BERT L1",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "value",
@@ -513,16 +900,34 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "—",
+          "noValue": "\u00e2\u20ac\u201d",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": -0.5 },
-              { "color": "yellow", "value": -0.2 },
-              { "color": "blue", "value": 0 },
-              { "color": "light-green", "value": 0.2 },
-              { "color": "green", "value": 0.5 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -0.5
+              },
+              {
+                "color": "yellow",
+                "value": -0.2
+              },
+              {
+                "color": "blue",
+                "value": 0
+              },
+              {
+                "color": "light-green",
+                "value": 0.2
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
             ]
           }
         },
@@ -532,28 +937,53 @@
     {
       "id": 81,
       "type": "stat",
-      "title": "BERT Lag-2",
+      "title": "BERT L2",
       "description": "Pearson corr between BERT sentiment shifted 2 buckets and bucket return.",
-      "gridPos": { "x": 17, "y": 7, "w": 3, "h": 4 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "gridPos": {
+        "x": 17,
+        "y": 6,
+        "w": 3,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/correlation",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "lag2_corr_bert", "text": "BERT L2", "type": "number" }
+            {
+              "selector": "lag2_corr_bert",
+              "text": "BERT L2",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
         "orientation": "auto",
         "textMode": "value_and_name",
         "colorMode": "value",
@@ -566,58 +996,36 @@
           "decimals": 4,
           "min": -1,
           "max": 1,
-          "noValue": "—",
+          "noValue": "\u00e2\u20ac\u201d",
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "red", "value": null },
-              { "color": "orange", "value": -0.5 },
-              { "color": "yellow", "value": -0.2 },
-              { "color": "blue", "value": 0 },
-              { "color": "light-green", "value": 0.2 },
-              { "color": "green", "value": 0.5 }
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": -0.5
+              },
+              {
+                "color": "yellow",
+                "value": -0.2
+              },
+              {
+                "color": "blue",
+                "value": 0
+              },
+              {
+                "color": "light-green",
+                "value": 0.2
+              },
+              {
+                "color": "green",
+                "value": 0.5
+              }
             ]
           }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 9,
-      "type": "stat",
-      "title": "Matched Buckets",
-      "description": "Total 15-min buckets with overlapping price + sentiment data. Need ≥ 4 for any lag correlation.",
-      "gridPos": { "x": 20, "y": 7, "w": 4, "h": 4 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "url": "/coin/${coin}/correlation",
-          "url_options": { "method": "GET", "data": "" },
-          "root_selector": "",
-          "columns": [
-            { "selector": "matched_hours", "text": "Hours", "type": "number" }
-          ],
-          "filters": []
-        }
-      ],
-      "options": {
-        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
-        "orientation": "auto",
-        "textMode": "value_and_name",
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short",
-          "decimals": 0,
-          "color": { "mode": "fixed", "fixedColor": "#73BF69" }
         },
         "overrides": []
       }
@@ -625,225 +1033,232 @@
     {
       "id": 102,
       "type": "row",
-      "title": "Price Action — 1m Candles, 24h",
+      "title": "Market Action \u00e2\u20ac\u201d synced crosshair (hover any chart)",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 11, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 1
+      },
       "panels": []
     },
     {
       "id": 10,
       "type": "candlestick",
-      "title": "${coin} — OHLCV + EMA12 / EMA26 / SMA20 / SMA50",
-      "description": "1-minute candles with four overlay moving averages. EMA12 (orange) and EMA26 (cyan) are short-term momentum. SMA20 (yellow) is intermediate trend. SMA50 (gray) is the slow baseline.",
-      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 14 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "title": "${coin} \u00e2\u20ac\u201d OHLC + EMA12 / EMA26 / SMA20 / SMA50",
+      "description": "1m candles + four MAs. EMA12 (orange) / EMA26 (cyan) momentum; SMA20 (yellow dashed) / SMA50 (gray dashed) trend.",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 12
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/candles?hours=24",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "ts", "text": "time", "type": "timestamp" },
-            { "selector": "open", "text": "open", "type": "number" },
-            { "selector": "high", "text": "high", "type": "number" },
-            { "selector": "low", "text": "low", "type": "number" },
-            { "selector": "close", "text": "close", "type": "number" },
-            { "selector": "volume", "text": "volume", "type": "number" },
-            { "selector": "ema12", "text": "EMA12", "type": "number" },
-            { "selector": "ema26", "text": "EMA26", "type": "number" },
-            { "selector": "sma20", "text": "SMA20", "type": "number" },
-            { "selector": "sma50", "text": "SMA50", "type": "number" }
+            {
+              "selector": "ts",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "open",
+              "text": "open",
+              "type": "number"
+            },
+            {
+              "selector": "high",
+              "text": "high",
+              "type": "number"
+            },
+            {
+              "selector": "low",
+              "text": "low",
+              "type": "number"
+            },
+            {
+              "selector": "close",
+              "text": "close",
+              "type": "number"
+            },
+            {
+              "selector": "ema12",
+              "text": "EMA12",
+              "type": "number"
+            },
+            {
+              "selector": "ema26",
+              "text": "EMA26",
+              "type": "number"
+            },
+            {
+              "selector": "sma20",
+              "text": "SMA20",
+              "type": "number"
+            },
+            {
+              "selector": "sma50",
+              "text": "SMA50",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "mode": "candles+volume",
+        "mode": "candles",
         "candleStyle": "candles",
         "colorStrategy": "open-close",
-        "colors": { "up": "#73BF69", "down": "#F2495C", "flat": "gray" },
+        "colors": {
+          "up": "#73BF69",
+          "down": "#F2495C",
+          "flat": "gray"
+        },
         "includeAllFields": true,
         "fields": {
           "open": "open",
           "high": "high",
           "low": "low",
-          "close": "close",
-          "volume": "volume"
+          "close": "close"
         },
-        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull"] },
-        "tooltip": { "mode": "multi", "sort": "none" }
-      },
-      "fieldConfig": {
-        "defaults": { "unit": "currencyUSD", "decimals": 4 },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "EMA12" },
-            "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } },
-              { "id": "custom.lineWidth", "value": 2 },
-              { "id": "custom.lineInterpolation", "value": "smooth" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "EMA26" },
-            "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } },
-              { "id": "custom.lineWidth", "value": 2 },
-              { "id": "custom.lineInterpolation", "value": "smooth" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "SMA20" },
-            "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FADE2A" } },
-              { "id": "custom.lineWidth", "value": 1.5 },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [6, 4] } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "SMA50" },
-            "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#B0BEC5" } },
-              { "id": "custom.lineWidth", "value": 1.5 },
-              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 6] } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "volume" },
-            "properties": [
-              { "id": "unit", "value": "short" }
-            ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 103,
-      "type": "row",
-      "title": "Technical Indicators",
-      "collapsed": false,
-      "gridPos": { "x": 0, "y": 26, "w": 24, "h": 1 },
-      "panels": []
-    },
-    {
-      "id": 11,
-      "type": "timeseries",
-      "title": "RSI(14) — Wilder",
-      "description": "Relative Strength Index. > 70 = overbought (red zone). < 30 = oversold (green zone).",
-      "gridPos": { "x": 0, "y": 27, "w": 12, "h": 9 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "url": "/coin/${coin}/candles?hours=24",
-          "url_options": { "method": "GET", "data": "" },
-          "root_selector": "",
-          "columns": [
-            { "selector": "ts", "text": "time", "type": "timestamp" },
-            { "selector": "rsi14", "text": "RSI", "type": "number" }
-          ],
-          "filters": []
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
         }
-      ],
-      "options": {
-        "tooltip": { "mode": "single", "sort": "none" },
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull"] }
       },
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "decimals": 1,
-          "min": 0,
-          "max": 100,
-          "color": { "mode": "fixed", "fixedColor": "#B877D9" },
-          "custom": {
-            "drawStyle": "line",
-            "lineWidth": 2,
-            "lineInterpolation": "smooth",
-            "fillOpacity": 15,
-            "thresholdsStyle": { "mode": "line+area" }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "rgba(115, 191, 105, 0.10)", "value": null },
-              { "color": "transparent", "value": 30 },
-              { "color": "rgba(242, 73, 92, 0.10)", "value": 70 }
-            ]
-          }
+          "unit": "currencyUSD",
+          "decimals": 4
         },
-        "overrides": []
-      }
-    },
-    {
-      "id": 12,
-      "type": "timeseries",
-      "title": "MACD (12, 26, 9)",
-      "description": "MACD line (blue) crossing the Signal (orange) hints at trend shifts. Histogram = MACD - Signal.",
-      "gridPos": { "x": 12, "y": 27, "w": 12, "h": 9 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "url": "/coin/${coin}/candles?hours=24",
-          "url_options": { "method": "GET", "data": "" },
-          "root_selector": "",
-          "columns": [
-            { "selector": "ts", "text": "time", "type": "timestamp" },
-            { "selector": "macd", "text": "MACD", "type": "number" },
-            { "selector": "macd_signal", "text": "Signal", "type": "number" },
-            { "selector": "macd_hist", "text": "Histogram", "type": "number" }
-          ],
-          "filters": []
-        }
-      ],
-      "options": {
-        "tooltip": { "mode": "multi", "sort": "none" },
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull"] }
-      },
-      "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "lineWidth": 1.5, "fillOpacity": 0, "lineInterpolation": "smooth" } },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "MACD" },
+            "matcher": {
+              "id": "byName",
+              "options": "EMA12"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } },
-              { "id": "custom.lineWidth", "value": 2 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Signal" },
-            "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } },
-              { "id": "custom.lineWidth", "value": 2 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Histogram" },
-            "properties": [
-              { "id": "custom.drawStyle", "value": "bars" },
-              { "id": "custom.fillOpacity", "value": 80 },
-              { "id": "color", "value": { "mode": "thresholds" } },
               {
-                "id": "thresholds",
+                "id": "color",
                 "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    { "color": "#F2495C", "value": null },
-                    { "color": "#73BF69", "value": 0 }
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "smooth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "EMA26"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "smooth"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA20"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    6,
+                    4
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "SMA50"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B0BEC5"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1.5
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    6
                   ]
                 }
               }
@@ -853,176 +1268,783 @@
       }
     },
     {
-      "id": 104,
-      "type": "row",
-      "title": "Sentiment vs. Price",
-      "collapsed": false,
-      "gridPos": { "x": 0, "y": 36, "w": 24, "h": 1 },
-      "panels": []
+      "id": 18,
+      "type": "timeseries",
+      "title": "Volume (1m)",
+      "description": "Per-minute traded volume. Aligns with the candles above \u00e2\u20ac\u201d use shared crosshair.",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 4
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/coin/${coin}/candles?hours=24",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "ts",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "volume",
+              "text": "Volume",
+              "type": "number"
+            }
+          ],
+          "filters": [],
+          "parser": "backend"
+        }
+      ],
+      "options": {
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": false
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "#5794F2"
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 0,
+            "fillOpacity": 80,
+            "barAlignment": 0
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Price + Sentiment (hourly, 7d)",
-      "description": "Left axis = USD price (blue). Right axis = compound sentiment in [-1, 1]. Dotted = sentiment shifted 1h / 2h. Look for sentiment spikes leading price moves.",
-      "gridPos": { "x": 0, "y": 37, "w": 12, "h": 11 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "title": "Price \u00e2\u2020\u201d Sentiment (hourly, 7d) \u00e2\u20ac\u201d left axis $, right axis \u00c2\u00b11",
+      "description": "Solid blue = hourly close price (left, USD). Solid purple/blue = VADER / BERT compound sentiment (right, [-1, 1]). Dotted = sentiment shifted 1h / 2h ahead \u00e2\u20ac\u201d toggle in legend to see if sentiment leads price. Watch for sentiment spikes preceding price spikes. Pink/cyan lines = rolling avg over last 100 tweets/coin (refreshed every 60s; covers gaps when scraper is bursty). Hover for sample size + age \u00e2\u20ac\u201d older than 30min suggests scraper lag.",
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 9
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/price-sentiment?days=7",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "ts", "text": "time", "type": "timestamp" },
-            { "selector": "price", "text": "Price", "type": "number" },
-            { "selector": "avg_compound", "text": "VADER", "type": "number" },
-            { "selector": "avg_compound_bert", "text": "BERT", "type": "number" },
-            { "selector": "sentiment_lag1", "text": "VADER Lag-1", "type": "number" },
-            { "selector": "sentiment_lag2", "text": "VADER Lag-2", "type": "number" },
-            { "selector": "sentiment_bert_lag1", "text": "BERT Lag-1", "type": "number" },
-            { "selector": "sentiment_bert_lag2", "text": "BERT Lag-2", "type": "number" }
+            {
+              "selector": "ts",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "price",
+              "text": "Price",
+              "type": "number"
+            },
+            {
+              "selector": "avg_compound",
+              "text": "VADER",
+              "type": "number"
+            },
+            {
+              "selector": "avg_compound_bert",
+              "text": "BERT",
+              "type": "number"
+            },
+            {
+              "selector": "sentiment_lag1",
+              "text": "VADER Lag-1",
+              "type": "number"
+            },
+            {
+              "selector": "sentiment_lag2",
+              "text": "VADER Lag-2",
+              "type": "number"
+            },
+            {
+              "selector": "sentiment_bert_lag1",
+              "text": "BERT Lag-1",
+              "type": "number"
+            },
+            {
+              "selector": "sentiment_bert_lag2",
+              "text": "BERT Lag-2",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/coin/${coin}/sentiment-live-window?hours=168",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "ts",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "avg_vader",
+              "text": "VADER 1m",
+              "type": "number"
+            },
+            {
+              "selector": "avg_bert",
+              "text": "BERT 1m",
+              "type": "number"
+            },
+            {
+              "selector": "n_tweets",
+              "text": "Tweets/min",
+              "type": "number"
+            },
+            {
+              "selector": "oldest_age_sec",
+              "text": "Sample Age (s)",
+              "type": "number"
+            }
+          ],
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "tooltip": { "mode": "multi", "sort": "none" },
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": ["lastNotNull"] }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
       },
       "fieldConfig": {
-        "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "lineInterpolation": "smooth" } },
+        "defaults": {
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 0,
+            "lineInterpolation": "smooth",
+            "spanNulls": true
+          }
+        },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Price" },
+            "matcher": {
+              "id": "byName",
+              "options": "Price"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } },
-              { "id": "unit", "value": "currencyUSD" },
-              { "id": "custom.fillOpacity", "value": 10 }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "currencyUSD"
+              },
+              {
+                "id": "decimals",
+                "value": 4
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Price (USD)"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2.5
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 8
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "VADER" },
+            "matcher": {
+              "id": "byName",
+              "options": "VADER"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#B877D9" } },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 1 }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#B877D9"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Sentiment"
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "BERT" },
+            "matcher": {
+              "id": "byName",
+              "options": "BERT"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#3274D9" } },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 1 }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#3274D9"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "VADER Lag-1" },
+            "matcher": {
+              "id": "byName",
+              "options": "VADER Lag-1"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FADE2A" } },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
-              { "id": "custom.lineWidth", "value": 1 },
-              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 1 }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FADE2A"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dot"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "VADER Lag-2" },
+            "matcher": {
+              "id": "byName",
+              "options": "VADER Lag-2"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
-              { "id": "custom.lineWidth", "value": 1 },
-              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 1 }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF9830"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dot"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "BERT Lag-1" },
+            "matcher": {
+              "id": "byName",
+              "options": "BERT Lag-1"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#37872D" } },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
-              { "id": "custom.lineWidth", "value": 1 },
-              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 1 }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#37872D"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dot"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "BERT Lag-2" },
+            "matcher": {
+              "id": "byName",
+              "options": "BERT Lag-2"
+            },
             "properties": [
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#C4162A" } },
-              { "id": "custom.axisPlacement", "value": "right" },
-              { "id": "custom.lineStyle", "value": { "fill": "dot" } },
-              { "id": "custom.lineWidth", "value": 1 },
-              { "id": "custom.hideFrom", "value": { "legend": false, "tooltip": false, "viz": true } },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 1 }
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#C4162A"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dot"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "VADER 1m"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF49C8"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Sentiment"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "linear"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.spanNulls",
+                "value": 60000
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "BERT 1m"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#00E5FF"
+                }
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Sentiment"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "linear"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 0
+              },
+              {
+                "id": "custom.spanNulls",
+                "value": 60000
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tweets/min"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Sample Age (s)"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#FF7383"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.hideFrom",
+                "value": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": true
+                }
+              }
             ]
           }
         ]
       }
     },
     {
-      "id": 14,
-      "type": "barchart",
-      "title": "Hourly Sentiment Distribution (7d)",
-      "description": "Stacked positive / neutral / negative %, hourly buckets.",
-      "gridPos": { "x": 12, "y": 37, "w": 12, "h": 11 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "id": 19,
+      "type": "timeseries",
+      "title": "Tweet volume + sentiment mix (hourly)",
+      "description": "Stacked positive/neutral/negative tweet counts per hour. Shows when conversation spikes \u00e2\u20ac\u201d align with price spikes above via shared crosshair.",
+      "gridPos": {
+        "x": 0,
+        "y": 36,
+        "w": 24,
+        "h": 5
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
           "url": "/coin/${coin}/sentiment/hourly?days=7",
-          "url_options": { "method": "GET", "data": "" },
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "ts", "text": "time", "type": "timestamp" },
-            { "selector": "positive_pct", "text": "Positive", "type": "number" },
-            { "selector": "neutral_pct", "text": "Neutral", "type": "number" },
-            { "selector": "negative_pct", "text": "Negative", "type": "number" }
+            {
+              "selector": "ts",
+              "text": "time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "positive_count",
+              "text": "Positive",
+              "type": "number"
+            },
+            {
+              "selector": "neutral_count",
+              "text": "Neutral",
+              "type": "number"
+            },
+            {
+              "selector": "negative_count",
+              "text": "Negative",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
-        "orientation": "auto",
-        "stacking": "percent",
-        "showValue": "never",
-        "groupWidth": 0.85,
-        "barWidth": 0.97,
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true, "calcs": [] },
-        "tooltip": { "mode": "multi", "sort": "none" }
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "sum"
+          ]
+        }
       },
       "fieldConfig": {
-        "defaults": { "unit": "percent", "min": 0, "max": 100 },
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 0,
+            "fillOpacity": 90,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Positive" },
-            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Positive"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#73BF69"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Neutral" },
-            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#828282" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Neutral"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#828282"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "Negative" },
-            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#F2495C" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "Negative"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#F2495C"
+                }
+              }
+            ]
           }
         ]
       }
@@ -1030,81 +2052,392 @@
     {
       "id": 105,
       "type": "row",
-      "title": "Tweets",
+      "title": "Tweets \u00e2\u20ac\u201d follow dashboard time window",
       "collapsed": false,
-      "gridPos": { "x": 0, "y": 48, "w": 24, "h": 1 },
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 24,
+        "h": 1
+      },
       "panels": []
     },
     {
-      "id": 15,
+      "id": 17,
       "type": "table",
-      "title": "Top Positive Tweets",
-      "gridPos": { "x": 0, "y": 49, "w": 12, "h": 11 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "title": "Tweets in selected time window",
+      "description": "Tweets posted within the dashboard time picker. Zoom or pan the candles \u00e2\u2020\u2019 this list updates.",
+      "gridPos": {
+        "x": 0,
+        "y": 42,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
-          "url": "/coin/${coin}/tweets?sentiment=positive&limit=15",
-          "url_options": { "method": "GET", "data": "" },
+          "url": "/coin/${coin}/tweets?sentiment=all&limit=100&since_ms=${__from}&until_ms=${__to}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "ts", "text": "Time", "type": "timestamp" },
-            { "selector": "username", "text": "User", "type": "string" },
-            { "selector": "text", "text": "Tweet", "type": "string" },
-            { "selector": "compound", "text": "Score", "type": "number" }
+            {
+              "selector": "ts",
+              "text": "Time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "username",
+              "text": "User",
+              "type": "string"
+            },
+            {
+              "selector": "text",
+              "text": "Tweet",
+              "type": "string"
+            },
+            {
+              "selector": "compound",
+              "text": "Score",
+              "type": "number"
+            },
+            {
+              "selector": "url",
+              "text": "Link",
+              "type": "string"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
         "showHeader": true,
-        "footer": { "show": false },
+        "footer": {
+          "show": false
+        },
         "cellHeight": "md"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "displayMode": "auto", "filterable": true, "inspect": false }
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "filterable": true,
+            "inspect": false
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Time" },
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
             "properties": [
-              { "id": "custom.width", "value": 110 }
+              {
+                "id": "custom.width",
+                "value": 130
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "User" },
+            "matcher": {
+              "id": "byName",
+              "options": "User"
+            },
             "properties": [
-              { "id": "custom.width", "value": 110 },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
+              {
+                "id": "custom.width",
+                "value": 130
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Tweet" },
+            "matcher": {
+              "id": "byName",
+              "options": "Tweet"
+            },
             "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "auto", "wrapText": true } }
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "Score" },
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
             "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-              { "id": "custom.width", "value": 90 },
-              { "id": "decimals", "value": 3 },
-              { "id": "min", "value": 0 },
-              { "id": "max", "value": 1 },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
               {
                 "id": "thresholds",
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    { "color": "light-green", "value": null },
-                    { "color": "green", "value": 0.4 },
-                    { "color": "dark-green", "value": 0.7 }
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": -0.05
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 0.05
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.4
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Link"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "json-view"
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Open tweet",
+                    "url": "${__value.text}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "type": "table",
+      "title": "Top Positive (in window)",
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
+          "type": "json",
+          "source": "url",
+          "format": "table",
+          "url": "/coin/${coin}/tweets?sentiment=positive&limit=15&since_ms=${__from}&until_ms=${__to}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
+          "root_selector": "",
+          "columns": [
+            {
+              "selector": "ts",
+              "text": "Time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "username",
+              "text": "User",
+              "type": "string"
+            },
+            {
+              "selector": "text",
+              "text": "Tweet",
+              "type": "string"
+            },
+            {
+              "selector": "compound",
+              "text": "Score",
+              "type": "number"
+            }
+          ],
+          "filters": [],
+          "parser": "backend"
+        }
+      ],
+      "options": {
+        "showHeader": true,
+        "footer": {
+          "show": false
+        },
+        "cellHeight": "md"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "filterable": true,
+            "inspect": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "User"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Tweet"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 1
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "light-green",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0.4
+                    },
+                    {
+                      "color": "dark-green",
+                      "value": 0.7
+                    }
                   ]
                 }
               }
@@ -1116,153 +2449,168 @@
     {
       "id": 16,
       "type": "table",
-      "title": "Top Negative Tweets / FUD",
-      "gridPos": { "x": 12, "y": 49, "w": 12, "h": 11 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+      "title": "Top Negative / FUD (in window)",
+      "gridPos": {
+        "x": 12,
+        "y": 52,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": {
+        "type": "yesoreyeram-infinity-datasource",
+        "uid": "velora"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
+          "datasource": {
+            "type": "yesoreyeram-infinity-datasource",
+            "uid": "velora"
+          },
           "type": "json",
           "source": "url",
           "format": "table",
-          "url": "/coin/${coin}/tweets?sentiment=negative&limit=15",
-          "url_options": { "method": "GET", "data": "" },
+          "url": "/coin/${coin}/tweets?sentiment=negative&limit=15&since_ms=${__from}&until_ms=${__to}",
+          "url_options": {
+            "method": "GET",
+            "data": ""
+          },
           "root_selector": "",
           "columns": [
-            { "selector": "ts", "text": "Time", "type": "timestamp" },
-            { "selector": "username", "text": "User", "type": "string" },
-            { "selector": "text", "text": "Tweet", "type": "string" },
-            { "selector": "compound", "text": "Score", "type": "number" }
+            {
+              "selector": "ts",
+              "text": "Time",
+              "type": "timestamp"
+            },
+            {
+              "selector": "username",
+              "text": "User",
+              "type": "string"
+            },
+            {
+              "selector": "text",
+              "text": "Tweet",
+              "type": "string"
+            },
+            {
+              "selector": "compound",
+              "text": "Score",
+              "type": "number"
+            }
           ],
-          "filters": []
+          "filters": [],
+          "parser": "backend"
         }
       ],
       "options": {
         "showHeader": true,
-        "footer": { "show": false },
+        "footer": {
+          "show": false
+        },
         "cellHeight": "md"
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "align": "auto", "displayMode": "auto", "filterable": true, "inspect": false }
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto",
+            "filterable": true,
+            "inspect": false
+          }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Time" },
+            "matcher": {
+              "id": "byName",
+              "options": "Time"
+            },
             "properties": [
-              { "id": "custom.width", "value": 110 }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "User" },
-            "properties": [
-              { "id": "custom.width", "value": 110 },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Tweet" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "auto", "wrapText": true } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Score" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-              { "id": "custom.width", "value": 90 },
-              { "id": "decimals", "value": 3 },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 0 },
               {
-                "id": "thresholds",
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "User"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              },
+              {
+                "id": "color",
                 "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    { "color": "dark-red", "value": null },
-                    { "color": "red", "value": -0.7 },
-                    { "color": "orange", "value": -0.4 }
-                  ]
+                  "mode": "fixed",
+                  "fixedColor": "#5794F2"
                 }
               }
             ]
-          }
-        ]
-      }
-    },
-    {
-      "id": 17,
-      "type": "table",
-      "title": "Latest Tweets (newest first)",
-      "description": "Recent tweets across all sentiments. Useful for spotting fresh narrative shifts.",
-      "gridPos": { "x": 0, "y": 60, "w": 24, "h": 10 },
-      "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": { "type": "yesoreyeram-infinity-datasource", "uid": "velora" },
-          "type": "json",
-          "source": "url",
-          "format": "table",
-          "url": "/coin/${coin}/tweets?sentiment=all&limit=30",
-          "url_options": { "method": "GET", "data": "" },
-          "root_selector": "",
-          "columns": [
-            { "selector": "ts", "text": "Time", "type": "timestamp" },
-            { "selector": "username", "text": "User", "type": "string" },
-            { "selector": "text", "text": "Tweet", "type": "string" },
-            { "selector": "compound", "text": "Score", "type": "number" }
-          ],
-          "filters": []
-        }
-      ],
-      "options": {
-        "showHeader": true,
-        "footer": { "show": false },
-        "cellHeight": "md"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": { "align": "auto", "displayMode": "auto", "filterable": true, "inspect": false }
-        },
-        "overrides": [
+          },
           {
-            "matcher": { "id": "byName", "options": "Time" },
+            "matcher": {
+              "id": "byName",
+              "options": "Tweet"
+            },
             "properties": [
-              { "id": "custom.width", "value": 130 }
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "auto",
+                  "wrapText": true
+                }
+              }
             ]
           },
           {
-            "matcher": { "id": "byName", "options": "User" },
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
             "properties": [
-              { "id": "custom.width", "value": 130 },
-              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Tweet" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "auto", "wrapText": true } }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Score" },
-            "properties": [
-              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient" } },
-              { "id": "custom.width", "value": 90 },
-              { "id": "decimals", "value": 3 },
-              { "id": "min", "value": -1 },
-              { "id": "max", "value": 1 },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "gradient"
+                }
+              },
+              {
+                "id": "custom.width",
+                "value": 90
+              },
+              {
+                "id": "decimals",
+                "value": 3
+              },
+              {
+                "id": "min",
+                "value": -1
+              },
+              {
+                "id": "max",
+                "value": 0
+              },
               {
                 "id": "thresholds",
                 "value": {
                   "mode": "absolute",
                   "steps": [
-                    { "color": "red", "value": null },
-                    { "color": "orange", "value": -0.05 },
-                    { "color": "yellow", "value": 0.05 },
-                    { "color": "green", "value": 0.4 }
+                    {
+                      "color": "dark-red",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": -0.7
+                    },
+                    {
+                      "color": "orange",
+                      "value": -0.4
+                    }
                   ]
                 }
               }

@@ -1,12 +1,13 @@
 """Velora consumer supervisor.
 
 Boot order:
-  1. apply schema (idempotent)
-  2. init asyncpg pool
-  3. spawn 5 long-running tasks: prices, tweets, vader, bert, aggregator
-  4. host uvicorn for the FastAPI app
+  1. init asyncpg pool (schema applied by docker init scripts on first volume init)
+  2. spawn long-running tasks: prices, tweets, vader, bert, aggregator,
+     live_sentiment, cagg_refresh, maintenance
+  3. host uvicorn for the FastAPI app
 
-NO preseed. App starts cold; data fills in as workers run.
+Data seeding lives in the `seed/` package and is run separately:
+  uv run python -m seed
 """
 from __future__ import annotations
 
@@ -22,11 +23,10 @@ if str(_REPO_ROOT) not in sys.path:
 import uvicorn
 
 from consumer.api.main import app
-from consumer.bootstrap_prices import backfill_prices
 from consumer.config import settings
 from consumer.consumers import prices, tweets
-from consumer.db import apply_schema, close_pool, init_pool
-from consumer.workers import aggregator, bert, vader
+from consumer.db import close_pool, init_pool
+from consumer.workers import aggregator, bert, cagg_refresh, live_sentiment, maintenance, vader
 
 
 async def main() -> None:
@@ -36,14 +36,8 @@ async def main() -> None:
     )
     log = logging.getLogger("velora")
 
-    log.info("applying schema...")
-    await apply_schema()
-
     log.info("initializing db pool...")
     pool = await init_pool()
-
-    log.info("backfilling prices_1m from binance...")
-    await backfill_prices(pool)
 
     log.info("spawning workers + uvicorn on %s:%d", settings.api_host, settings.api_port)
 
@@ -61,6 +55,9 @@ async def main() -> None:
         asyncio.create_task(vader.run(pool), name="vader"),
         asyncio.create_task(bert.run(pool), name="bert"),
         asyncio.create_task(aggregator.run(pool), name="aggregator"),
+        asyncio.create_task(live_sentiment.run(pool), name="live_sentiment"),
+        asyncio.create_task(cagg_refresh.run(pool), name="cagg_refresh"),
+        asyncio.create_task(maintenance.run(pool), name="maintenance"),
         asyncio.create_task(server.serve(), name="api"),
     ]
 
